@@ -10,6 +10,7 @@ from app.schemas.auth import LoginRequest, TokenResponse
 from app.auth.dependencies import get_current_user
 from app.models.user import User
 from fastapi.security import OAuth2PasswordRequestForm
+from app.auth.permissions import require_roles
 
 router = APIRouter(prefix="/auth", tags=["Authentication"])
 
@@ -81,3 +82,15 @@ def get_profile(
     current_user: User = Depends(get_current_user),
 ):
     return current_user
+
+@router.get("/admin")
+def admin_dashboard(
+    current_user: User = Depends(
+        require_roles("Admin")
+    ),
+):
+    return {
+        "message": "Welcome Admin!",
+        "user": current_user.full_name,
+        "role": current_user.role.name,
+    }
