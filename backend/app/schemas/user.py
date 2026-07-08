@@ -21,3 +21,11 @@ class UserResponse(UserBase):
     id: int
     is_active: bool
     role: RoleResponse
+    
+
+class UserProfileUpdate(BaseSchema):
+    full_name: str
+
+
+class UserProfileResponse(UserResponse):
+    pass

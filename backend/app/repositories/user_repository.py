@@ -30,3 +30,8 @@ class UserRepository(BaseRepository[User]):
         self.db.commit()
         self.db.refresh(user)
         return user
+    
+    def update(self, user: User):
+        self.db.commit()
+        self.db.refresh(user)
+        return user
