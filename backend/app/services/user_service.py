@@ -6,6 +6,8 @@ from app.repositories.user_repository import UserRepository
 from app.schemas.user import UserCreate
 from app.services.base_service import BaseService
 from app.repositories.role_repository import RoleRepository
+from app.auth.hashing import verify_password
+from app.auth.jwt_handler import create_access_token
 
 
 class UserService(BaseService[UserRepository]):
@@ -49,3 +51,39 @@ class UserService(BaseService[UserRepository]):
         )
 
         return self.repository.create(user)
+    
+    def authenticate_user(
+        self,
+        email: str,
+        password: str,
+    ):
+        user = self.repository.get_by_email(email)
+
+        if user is None:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid email or password",
+            )
+
+        if not verify_password(
+            password,
+            user.hashed_password,
+        ):
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid email or password",
+            )
+
+        access_token = create_access_token(
+            {
+                "sub": str(user.id),
+                "email": user.email,
+                "role": user.role.name,
+                "type": "access",
+            }
+        )
+
+        return {
+            "access_token": access_token,
+            "token_type": "bearer",
+        }
