@@ -4,10 +4,13 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.db.base import Base
 from app.models.base_model import TimestampMixin
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, List
 
 if TYPE_CHECKING:
     from app.models.user import User
+
+if TYPE_CHECKING:
+    from app.models.site import Site
 
 
 class Project(Base, TimestampMixin):
@@ -32,6 +35,11 @@ class Project(Base, TimestampMixin):
     region: Mapped[str] = mapped_column(
         String(100),
         nullable=False,
+    )
+
+    sites: Mapped[List["Site"]] = relationship(
+        back_populates="project",
+        cascade="all, delete-orphan",
     )
 
     created_by: Mapped[int] = mapped_column(
