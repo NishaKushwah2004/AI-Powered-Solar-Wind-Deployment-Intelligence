@@ -17,6 +17,13 @@ class RoleRepository(BaseRepository[Role]):
             .filter(Role.name == name)
             .first()
         )
+    
+    def get_by_id(self, role_id: int):
+        return (
+            self.db.query(Role)
+            .filter(Role.id == role_id)
+            .first()
+        )
 
     def create(self, role: Role):
         self.db.add(role)

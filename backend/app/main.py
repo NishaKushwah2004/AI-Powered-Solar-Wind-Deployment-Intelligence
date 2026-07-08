@@ -2,6 +2,7 @@ from fastapi import FastAPI
 from app.core.config import settings
 from sqlalchemy import text
 from app.db.database import engine
+from app.api.v1 import api_router
 
 
 def create_application() -> FastAPI:
@@ -24,12 +25,11 @@ def create_application() -> FastAPI:
             "status": "healthy",
             "application": settings.APP_NAME,
         }
-    
-    @app.get("/db-test")
-    async def db_test():
-        with engine.connect() as connection:
-            result = connection.execute(text("SELECT version();"))
-            return {"database": result.scalar()}
+        
+    app.include_router(
+        api_router,
+        prefix="/api/v1",
+    )
 
     return app
 

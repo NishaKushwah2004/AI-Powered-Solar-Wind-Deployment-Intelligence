@@ -1,9 +1,22 @@
+from fastapi import HTTPException, status
+
+from app.auth.hashing import hash_password
 from app.models.user import User
 from app.repositories.user_repository import UserRepository
+from app.schemas.user import UserCreate
 from app.services.base_service import BaseService
+from app.repositories.role_repository import RoleRepository
 
 
 class UserService(BaseService[UserRepository]):
+    def __init__(
+        self,
+        user_repository: UserRepository,
+        role_repository: RoleRepository,
+    ):
+        super().__init__(user_repository)
+        self.role_repository = role_repository
+
     def get_all_users(self):
         return self.repository.get_all()
 
@@ -11,4 +24,28 @@ class UserService(BaseService[UserRepository]):
         return self.repository.get_by_email(email)
 
     def create_user(self, user: User):
+        return self.repository.create(user)
+
+    def register_user(self, user_data: UserCreate):
+        if self.repository.get_by_email(user_data.email):
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Email is already registered",
+            )
+
+        role = self.role_repository.get_by_id(user_data.role_id)
+
+        if role is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Role not found",
+            )
+
+        user = User(
+            full_name=user_data.full_name,
+            email=user_data.email,
+            hashed_password=hash_password(user_data.password),
+            role_id=user_data.role_id,
+        )
+
         return self.repository.create(user)

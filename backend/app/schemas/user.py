@@ -1,6 +1,7 @@
 from app.schemas.base import BaseSchema
 from app.schemas.role import RoleResponse
 from pydantic import EmailStr
+from pydantic import Field
 
 
 class UserBase(BaseSchema):
@@ -9,7 +10,10 @@ class UserBase(BaseSchema):
 
 
 class UserCreate(UserBase):
-    password: str
+    password: str = Field(
+        min_length=8,
+        max_length=128,
+    )
     role_id: int
 
 

@@ -18,7 +18,7 @@ class UserRepository(BaseRepository[User]):
             .first()
         )
 
-    def create(self, user: User):
+    def create(self, user: User) -> User:
         self.db.add(user)
         self.db.commit()
         self.db.refresh(user)
