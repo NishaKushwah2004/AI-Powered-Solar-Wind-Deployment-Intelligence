@@ -3,6 +3,7 @@ from app.core.config import settings
 from sqlalchemy import text
 from app.db.database import engine
 from app.api.v1 import api_router
+from fastapi.middleware.cors import CORSMiddleware
 
 
 def create_application() -> FastAPI:
@@ -10,6 +11,16 @@ def create_application() -> FastAPI:
         title=settings.APP_NAME,
         version=settings.APP_VERSION,
         debug=settings.DEBUG,
+    )
+
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=[
+            "http://localhost:5173",
+        ],
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
     )
 
     @app.get("/", tags=["Health"])
