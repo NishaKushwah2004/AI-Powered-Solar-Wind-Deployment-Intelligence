@@ -11,3 +11,8 @@ from app.schemas.site import (
     SiteUpdate,
     SiteResponse,
 )
+from app.schemas.geojson import (
+    Geometry,
+    Feature,
+    FeatureCollection,
+)
