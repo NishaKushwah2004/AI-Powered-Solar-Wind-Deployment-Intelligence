@@ -1,10 +1,29 @@
 import { Navigate } from "react-router-dom";
-import { hasToken } from "../utils/storage";
 
-export default function ProtectedRoute({ children }) {
+import useAuth from "../hooks/useAuth";
 
-    if (!hasToken()) {
-        return <Navigate to="/login" replace />;
+import LoadingState from "../components/common/LoadingState";
+
+export default function ProtectedRoute({
+    children,
+}) {
+
+    const {
+        initialized,
+        user,
+    } = useAuth();
+
+    if (!initialized) {
+        return <LoadingState />;
+    }
+
+    if (!user) {
+        return (
+            <Navigate
+                to="/login"
+                replace
+            />
+        );
     }
 
     return children;

@@ -1,4 +1,8 @@
-import { createContext, useState } from "react";
+import {
+    createContext,
+    useState,
+    useEffect,
+} from "react";
 
 import {
     login as loginApi,
@@ -19,17 +23,21 @@ export function AuthProvider({ children }) {
 
     const [loading, setLoading] = useState(false);
 
+    // Indicates whether the initial authentication check has completed
+    const [initialized, setInitialized] = useState(false);
+
+    // ---------------- LOGIN ----------------
+
     const login = async (email, password) => {
 
         setLoading(true);
 
         try {
 
-            console.log("Sending Login Request...");
-
-            const token = await loginApi(email, password);
-
-            console.log("Login Response:", token);
+            const token = await loginApi(
+                email,
+                password,
+            );
 
             saveToken(token.access_token);
 
@@ -44,6 +52,8 @@ export function AuthProvider({ children }) {
 
             removeToken();
 
+            setUser(null);
+
             throw error;
 
         } finally {
@@ -54,6 +64,8 @@ export function AuthProvider({ children }) {
 
     };
 
+    // ---------------- LOGOUT ----------------
+
     const logout = () => {
 
         removeToken();
@@ -62,9 +74,15 @@ export function AuthProvider({ children }) {
 
     };
 
+    // ---------------- LOAD USER ----------------
+
     const loadUser = async () => {
 
-        if (!getToken()) {
+        const token = getToken();
+
+        if (!token) {
+
+            setInitialized(true);
 
             return;
 
@@ -77,15 +95,19 @@ export function AuthProvider({ children }) {
 
             setUser(profile);
 
-        }
-
-        catch {
+        } catch {
 
             logout();
+
+        } finally {
+
+            setInitialized(true);
 
         }
 
     };
+
+    // ---------------- ROLES ----------------
 
     const hasRole = (...roles) => {
 
@@ -97,6 +119,14 @@ export function AuthProvider({ children }) {
 
     };
 
+    // ---------------- INITIALIZE ----------------
+
+    useEffect(() => {
+
+        loadUser();
+
+    }, []);
+
     return (
 
         <AuthContext.Provider
@@ -106,6 +136,8 @@ export function AuthProvider({ children }) {
                 user,
 
                 loading,
+
+                initialized,
 
                 login,
 
