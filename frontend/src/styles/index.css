@@ -1,0 +1,19 @@
+@import "tailwindcss";
+
+/* Global Styles */
+
+html,
+body,
+#root {
+    width: 100%;
+    min-height: 100vh;
+}
+
+body {
+    margin: 0;
+    background: #F8FAFC;
+    font-family:
+        Inter,
+        system-ui,
+        sans-serif;
+}
