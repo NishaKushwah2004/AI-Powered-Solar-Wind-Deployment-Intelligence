@@ -1,0 +1,46 @@
+:root{
+
+    /* Background */
+
+    --color-background:#F8FAFC;
+    --color-surface:#FFFFFF;
+
+    /* Text */
+
+    --color-text:#0F172A;
+    --color-text-secondary:#64748B;
+
+    /* Brand */
+
+    --color-primary:#14B8A6;
+    --color-secondary:#0EA5E9;
+
+    /* Renewable */
+
+    --color-solar:#F59E0B;
+    --color-wind:#06B6D4;
+    --color-nature:#22C55E;
+
+    /* Status */
+
+    --color-success:#16A34A;
+    --color-warning:#F59E0B;
+    --color-danger:#DC2626;
+
+    /* Border */
+
+    --color-border:#E5E7EB;
+
+    /* Radius */
+
+    --radius-sm:8px;
+    --radius-md:12px;
+    --radius-lg:18px;
+
+    /* Shadow */
+
+    --shadow-sm:0 1px 2px rgba(0,0,0,.08);
+    --shadow-md:0 8px 24px rgba(0,0,0,.08);
+    --shadow-lg:0 18px 50px rgba(0,0,0,.12);
+
+}
