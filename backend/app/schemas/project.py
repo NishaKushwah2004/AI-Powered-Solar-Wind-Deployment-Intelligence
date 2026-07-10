@@ -1,3 +1,4 @@
+from datetime import datetime
 from typing import Optional
 
 from app.schemas.base import BaseSchema
@@ -37,3 +38,4 @@ class ProjectResponse(ProjectBase):
 
     id: int
     created_by: int
+    created_at: datetime

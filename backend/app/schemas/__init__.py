@@ -16,3 +16,4 @@ from app.schemas.geojson import (
     Feature,
     FeatureCollection,
 )
+from app.schemas.dashboard import DashboardSummaryResponse
