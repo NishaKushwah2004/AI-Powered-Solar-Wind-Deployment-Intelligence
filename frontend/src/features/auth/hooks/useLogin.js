@@ -23,27 +23,36 @@ export function useLogin() {
       setLoading(true);
     },
 
-    onSuccess: async (data) => {
-      login(data.access_token);
+    onSuccess: async (response) => {
+      try {
+        // Store JWT
+        login(response.access_token);
 
-      const user =
-        await authService.getCurrentUser();
+        // Fetch logged-in user
+        const user =
+          await authService.getCurrentUser();
 
-      setUser(user);
+        // Update AuthContext
+        setUser(user);
 
-      toast.success("Welcome back!");
+        toast.success("Welcome back!");
 
-      navigate(
-        ROUTES.DASHBOARD,
-        {
-          replace: true,
-        }
-      );
+        navigate(
+          ROUTES.DASHBOARD,
+          {
+            replace: true,
+          }
+        );
+      } catch (error) {
+        toast.error(
+          "Unable to load your profile."
+        );
+      }
     },
 
     onError: (error) => {
       toast.error(
-        error.response?.data?.detail ??
+        error?.response?.data?.detail ??
           "Login failed."
       );
     },

@@ -6,7 +6,7 @@ import DashboardLayout from "@/components/layout/DashboardLayout";
 import PublicLayout from "@/components/layout/PublicLayout";
 import ProtectedRoute from "@/components/layout/ProtectedRoute";
 
-import LandingPage from "@/features/landing/pages/LandingPage";
+import { LandingPage } from "@/features/landing";
 
 import LoginPage from "@/features/auth/pages/LoginPage";
 import RegisterPage from "@/features/auth/pages/RegisterPage";
@@ -14,8 +14,8 @@ import RegisterPage from "@/features/auth/pages/RegisterPage";
 import DashboardPage from "@/features/dashboard/pages/DashboardPage";
 import ProjectsPage from "@/features/projects/pages/ProjectsPage";
 import SitesPage from "@/features/sites/pages/SitesPage";
-import GISPage from "@/features/gis/pages/GISPage";
-import ProfilePage from "@/features/profile/pages/ProfilePage";
+import { GISPage } from "@/features/gis";
+import { ProfilePage } from "@/features/profile";
 import RoleGuard from "@/components/layout/RoleGuard";
 
 import {

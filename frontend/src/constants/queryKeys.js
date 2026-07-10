@@ -10,4 +10,10 @@ export const QUERY_KEYS = {
   SITE: (id) => ["site", id],
 
   PROFILE: ["profile"],
+
+  GIS_SITES: ["gis", "sites"],
+
+  GIS_SUMMARY: ["gis", "summary"],
+
+  GIS_CONFIG: ["gis", "config"],
 };

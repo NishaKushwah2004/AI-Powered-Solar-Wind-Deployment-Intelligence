@@ -35,7 +35,7 @@ export function AuthProvider({ children }) {
 
     setToken(null);
 
-    setUser(null);
+    setUser(DEFAULT_USER);
   };
 
   const value = useMemo(

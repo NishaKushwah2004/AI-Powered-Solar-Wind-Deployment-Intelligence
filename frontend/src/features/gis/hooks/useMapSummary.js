@@ -1,0 +1,13 @@
+import { useQuery } from "@tanstack/react-query";
+
+import { QUERY_KEYS } from "@/constants/queryKeys";
+
+import { gisService } from "../services/gisService";
+
+export function useMapSummary() {
+  return useQuery({
+    queryKey: QUERY_KEYS.GIS_SUMMARY,
+
+    queryFn: gisService.getSummary,
+  });
+}

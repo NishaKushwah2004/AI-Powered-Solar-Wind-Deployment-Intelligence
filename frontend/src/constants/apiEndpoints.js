@@ -15,5 +15,28 @@ export const API_ENDPOINTS = {
     DETAILS:(id)=>`/projects/${id}`,
     UPDATE:(id)=>`/projects/${id}`,
     DELETE:(id)=>`/projects/${id}`,
-  }
+  },
+
+  GIS: {
+    SITES: "/gis/sites",
+    SITE: (id) => `/gis/sites/${id}`,
+    PROJECT_SITES: (projectId) =>
+      `/gis/projects/${projectId}/sites`,
+    SUMMARY: "/gis/summary",
+    BBOX: "/gis/bbox",
+    CONFIG: "/gis/config",
+  },
+
+  PROFILE: {
+    BASE: "/profile",
+  },
+
+  SITES: {
+    BASE: "/sites",
+
+    BY_ID: (id) => `/sites/${id}`,
+
+    BY_PROJECT: (projectId) =>
+      `/sites/project/${projectId}`,
+  },
 };
