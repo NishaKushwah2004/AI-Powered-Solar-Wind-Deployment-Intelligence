@@ -23,7 +23,10 @@ import {
   EditSitePage,
 } from "@/features/sites";
 
-
+import {
+  NotFoundPage,
+  UnauthorizedPage,
+} from "@/features/errors";
 
 import {
   CreateProjectPage,
@@ -48,6 +51,11 @@ export const router = createBrowserRouter([
         element: <RegisterPage />,
       },
     ],
+  },
+
+  {
+    path: ROUTES.UNAUTHORIZED,
+    element: <UnauthorizedPage />,
   },
 
   {
@@ -139,5 +147,10 @@ export const router = createBrowserRouter([
         element: <ProfilePage />,
       },
     ],
+  },
+
+  {
+    path: ROUTES.NOT_FOUND,
+    element: <NotFoundPage />,
   },
 ]);

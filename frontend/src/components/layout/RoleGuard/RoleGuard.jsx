@@ -1,7 +1,6 @@
 import { Navigate } from "react-router-dom";
 
 import { ROUTES } from "@/config/navigation/routes";
-
 import { useAuth } from "@/features/auth/context/AuthContext";
 
 export default function RoleGuard({
@@ -10,14 +9,21 @@ export default function RoleGuard({
 }) {
   const { user } = useAuth();
 
-  if (!user) return null;
+  const role = user?.role?.name;
 
-  const role = user.role?.name;
+  if (!role) {
+    return (
+      <Navigate
+        to={ROUTES.LOGIN}
+        replace
+      />
+    );
+  }
 
   if (!allowedRoles.includes(role)) {
     return (
       <Navigate
-        to={ROUTES.DASHBOARD}
+        to={ROUTES.UNAUTHORIZED}
         replace
       />
     );

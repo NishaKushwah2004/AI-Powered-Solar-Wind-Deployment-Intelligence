@@ -36,5 +36,6 @@ export const ROUTES = {
   REPORTS: "/reports",
 
   // Errors
+  UNAUTHORIZED: "/unauthorized",
   NOT_FOUND: "*",
 };
