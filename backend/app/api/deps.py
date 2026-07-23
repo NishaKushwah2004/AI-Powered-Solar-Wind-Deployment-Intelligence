@@ -14,6 +14,22 @@ from app.services.environmental_service import EnvironmentalService
 from app.services.solar_service import SolarService
 from app.services.wind_service import WindService
 from app.services.assessment_service import AssessmentService
+from app.ml.features.feature_engineering import (
+    FeatureEngineering,
+)
+from app.ml.models.solar_predictor import (
+    SolarPredictor,
+)
+from app.ml.models.wind_predictor import (
+    WindPredictor,
+)
+from app.ml.models.suitability_predictor import (
+    SuitabilityPredictor,
+)
+from app.ml.services.prediction_service import (
+    PredictionService,
+)
+from backend.app.services.renewable_intelligence_service import RenewableIntelligenceService
 
 
 def get_db():
@@ -67,4 +83,26 @@ def get_environmental_service(
         solar_service=SolarService(),
         wind_service=WindService(),
         assessment_service=AssessmentService(),
+    )
+
+def get_prediction_service() -> PredictionService:
+    return PredictionService(
+        feature_engineering=FeatureEngineering(),
+        solar_predictor=SolarPredictor(),
+        wind_predictor=WindPredictor(),
+        suitability_predictor=SuitabilityPredictor(),
+    )
+
+def get_renewable_intelligence_service(
+    environmental_service: EnvironmentalService = Depends(
+        get_environmental_service
+    ),
+    prediction_service: PredictionService = Depends(
+        get_prediction_service
+    ),
+) -> RenewableIntelligenceService:
+
+    return RenewableIntelligenceService(
+        environmental_service=environmental_service,
+        prediction_service=prediction_service,
     )
