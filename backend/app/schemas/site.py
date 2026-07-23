@@ -13,7 +13,9 @@ class SiteBase(BaseSchema):
         min_length=3,
         max_length=150,
     )
+
     description: Optional[str] = None
+
     latitude: float = Field(
         ge=-90,
         le=90,
@@ -25,6 +27,19 @@ class SiteBase(BaseSchema):
         le=180,
         description="Longitude must be between -180 and 180",
     )
+
+    # -------------------------
+    # Site Information
+    # -------------------------
+
+    region: Optional[str] = None
+
+    land_area: Optional[float] = None
+
+    elevation: Optional[float] = None
+
+    existing_infrastructure: Optional[str] = None
+
     project_id: int
 
 
@@ -41,7 +56,9 @@ class SiteUpdate(BaseSchema):
     """
 
     name: Optional[str] = None
+
     description: Optional[str] = None
+
     latitude: Optional[float] = Field(
         default=None,
         ge=-90,
@@ -53,6 +70,23 @@ class SiteUpdate(BaseSchema):
         ge=-180,
         le=180,
     )
+
+    region: Optional[str] = None
+
+    land_area: Optional[float] = None
+
+    elevation: Optional[float] = None
+
+    existing_infrastructure: Optional[str] = None
+
+    land_use: Optional[str] = None
+
+    road_distance: Optional[float] = None
+
+    nearest_substation_distance: Optional[float] = None
+
+    nearest_transmission_line_distance: Optional[float] = None
+
     project_id: Optional[int] = None
 
 
@@ -62,3 +96,11 @@ class SiteResponse(SiteBase):
     """
 
     id: int
+
+    land_use: Optional[str] = None
+
+    road_distance: Optional[float] = None
+
+    nearest_substation_distance: Optional[float] = None
+
+    nearest_transmission_line_distance: Optional[float] = None

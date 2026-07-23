@@ -28,6 +28,48 @@ if config.config_file_name is not None:
 # target_metadata = mymodel.Base.metadata
 target_metadata = Base.metadata
 
+# Ignore PostGIS extension tables during autogenerate
+POSTGIS_TABLES = {
+    "spatial_ref_sys",
+    "topology",
+    "layer",
+    "geocode_settings",
+    "geocode_settings_default",
+    "loader_platform",
+    "loader_variables",
+    "loader_lookuptables",
+}
+
+
+def include_object(object, name, type_, reflected, compare_to):
+    # Ignore PostGIS system tables
+    if type_ == "table":
+        if (
+            name in POSTGIS_TABLES
+            or name.startswith("tiger")
+            or name.startswith("topology")
+            or name.startswith("pagc")
+            or name.startswith("addr")
+            or name.startswith("bg")
+            or name.startswith("county")
+            or name.startswith("cousub")
+            or name.startswith("direction")
+            or name.startswith("edges")
+            or name.startswith("faces")
+            or name.startswith("feat")
+            or name.startswith("place")
+            or name.startswith("secondary")
+            or name.startswith("state")
+            or name.startswith("street")
+            or name.startswith("tabblock")
+            or name.startswith("tract")
+            or name.startswith("zcta")
+            or name.startswith("zip")
+        ):
+            return False
+
+    return True
+
 # other values from the config, defined by the needs of env.py,
 # can be acquired:
 # my_important_option = config.get_main_option("my_important_option")
@@ -52,6 +94,7 @@ def run_migrations_offline() -> None:
         target_metadata=target_metadata,
         literal_binds=True,
         dialect_opts={"paramstyle": "named"},
+        include_object=include_object,
     )
 
     with context.begin_transaction():
@@ -73,7 +116,9 @@ def run_migrations_online() -> None:
 
     with connectable.connect() as connection:
         context.configure(
-            connection=connection, target_metadata=target_metadata
+            connection=connection,
+            target_metadata=target_metadata,
+            include_object=include_object,
         )
 
         with context.begin_transaction():

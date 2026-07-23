@@ -57,6 +57,10 @@ class SiteService(BaseService[SiteRepository]):
             description=site_data.description,
             latitude=site_data.latitude,
             longitude=site_data.longitude,
+            region=site_data.region,
+            land_area=site_data.land_area,
+            elevation=site_data.elevation,
+            existing_infrastructure=site_data.existing_infrastructure,
             project_id=site_data.project_id,
         )
 
@@ -96,6 +100,36 @@ class SiteService(BaseService[SiteRepository]):
 
         if site_data.longitude is not None:
             site.longitude = site_data.longitude
+
+        if site_data.region is not None:
+            site.region = site_data.region
+
+        if site_data.land_area is not None:
+            site.land_area = site_data.land_area
+
+        if site_data.elevation is not None:
+            site.elevation = site_data.elevation
+
+        if site_data.existing_infrastructure is not None:
+            site.existing_infrastructure = (
+                site_data.existing_infrastructure
+            )
+
+        if site_data.land_use is not None:
+            site.land_use = site_data.land_use
+
+        if site_data.road_distance is not None:
+            site.road_distance = site_data.road_distance
+
+        if site_data.nearest_substation_distance is not None:
+            site.nearest_substation_distance = (
+                site_data.nearest_substation_distance
+            )
+
+        if site_data.nearest_transmission_line_distance is not None:
+            site.nearest_transmission_line_distance = (
+                site_data.nearest_transmission_line_distance
+            )
 
         return self.repository.update(site)
 
