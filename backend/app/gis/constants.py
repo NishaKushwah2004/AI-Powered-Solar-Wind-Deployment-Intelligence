@@ -27,3 +27,15 @@ MARKER_CONFIG = {
         "icon": "solar-panel",
     }
 }
+
+# --------------------------------------------------
+# GIS Providers
+# --------------------------------------------------
+
+OVERPASS_API_URL = "https://overpass-api.de/api/interpreter"
+
+OPEN_ELEVATION_API_URL = "https://api.open-elevation.com"
+
+REQUEST_TIMEOUT = 30
+
+DEFAULT_SEARCH_RADIUS = 5000
