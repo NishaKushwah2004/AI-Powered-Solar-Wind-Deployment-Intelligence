@@ -5,6 +5,9 @@ from app.repositories.project_repository import ProjectRepository
 from app.repositories.site_repository import SiteRepository
 from app.schemas.site import SiteCreate, SiteUpdate
 from app.services.base_service import BaseService
+from app.services.gis_enrichment_service import (
+    GISEnrichmentService,
+)
 
 
 class SiteService(BaseService[SiteRepository]):
@@ -14,7 +17,11 @@ class SiteService(BaseService[SiteRepository]):
         project_repository: ProjectRepository,
     ):
         super().__init__(site_repository)
+
         self.project_repository = project_repository
+        self.gis_enrichment_service = (
+            GISEnrichmentService()
+        )
 
     def get_all_sites(self):
         return self.repository.get_all()
@@ -52,11 +59,43 @@ class SiteService(BaseService[SiteRepository]):
                 detail="Project not found",
             )
 
+        gis_data = (
+            self.gis_enrichment_service.enrich_site(
+                site_data.latitude,
+                site_data.longitude,
+            )
+        )
+
         site = Site(
             name=site_data.name,
             description=site_data.description,
+
             latitude=site_data.latitude,
             longitude=site_data.longitude,
+
+            region=site_data.region,
+            land_area=site_data.land_area,
+
+            elevation=gis_data.elevation,
+
+            land_use=gis_data.land_use,
+
+            existing_infrastructure=(
+                gis_data.existing_infrastructure
+            ),
+
+            road_distance=(
+                gis_data.road_distance
+            ),
+
+            nearest_substation_distance=(
+                gis_data.nearest_substation_distance
+            ),
+
+            nearest_transmission_line_distance=(
+                gis_data.nearest_transmission_line_distance
+            ),
+
             project_id=site_data.project_id,
         )
 
@@ -96,6 +135,36 @@ class SiteService(BaseService[SiteRepository]):
 
         if site_data.longitude is not None:
             site.longitude = site_data.longitude
+
+        if site_data.region is not None:
+            site.region = site_data.region
+
+        if site_data.land_area is not None:
+            site.land_area = site_data.land_area
+
+        if site_data.elevation is not None:
+            site.elevation = site_data.elevation
+
+        if site_data.existing_infrastructure is not None:
+            site.existing_infrastructure = (
+                site_data.existing_infrastructure
+            )
+
+        if site_data.land_use is not None:
+            site.land_use = site_data.land_use
+
+        if site_data.road_distance is not None:
+            site.road_distance = site_data.road_distance
+
+        if site_data.nearest_substation_distance is not None:
+            site.nearest_substation_distance = (
+                site_data.nearest_substation_distance
+            )
+
+        if site_data.nearest_transmission_line_distance is not None:
+            site.nearest_transmission_line_distance = (
+                site_data.nearest_transmission_line_distance
+            )
 
         return self.repository.update(site)
 

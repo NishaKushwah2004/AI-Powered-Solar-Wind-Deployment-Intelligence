@@ -1,10 +1,10 @@
+from typing import TYPE_CHECKING
+
 from sqlalchemy import Float, ForeignKey, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base
 from app.models.base_model import TimestampMixin
-
-from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from app.models.project import Project
@@ -28,6 +28,10 @@ class Site(Base, TimestampMixin):
         nullable=True,
     )
 
+    # ----------------------------
+    # Geographic Coordinates
+    # ----------------------------
+
     latitude: Mapped[float] = mapped_column(
         Float,
         nullable=False,
@@ -36,6 +40,56 @@ class Site(Base, TimestampMixin):
     longitude: Mapped[float] = mapped_column(
         Float,
         nullable=False,
+    )
+
+    # ----------------------------
+    # Site Information
+    # ----------------------------
+
+    region: Mapped[str | None] = mapped_column(
+        String(150),
+        nullable=True,
+    )
+
+    land_area: Mapped[float | None] = mapped_column(
+        Float,
+        nullable=True,
+    )
+
+    elevation: Mapped[float | None] = mapped_column(
+        Float,
+        nullable=True,
+    )
+
+    existing_infrastructure: Mapped[str | None] = mapped_column(
+        Text,
+        nullable=True,
+    )
+
+    # ----------------------------
+    # GIS Enrichment (Milestone 1)
+    # ----------------------------
+
+    land_use: Mapped[str | None] = mapped_column(
+        String(100),
+        nullable=True,
+    )
+
+    road_distance: Mapped[float | None] = mapped_column(
+        Float,
+        nullable=True,
+    )
+
+    nearest_substation_distance: Mapped[float | None] = mapped_column(
+        Float,
+        nullable=True,
+    )
+
+    nearest_transmission_line_distance: Mapped[
+        float | None
+    ] = mapped_column(
+        Float,
+        nullable=True,
     )
 
     project_id: Mapped[int] = mapped_column(
