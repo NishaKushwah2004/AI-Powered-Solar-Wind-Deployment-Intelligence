@@ -1,11 +1,18 @@
+from fastapi import HTTPException
+
 from app.environmental.clients.nasa_power_client import (
     NASAPowerClient,
 )
 from app.environmental.clients.weather_client import (
     WeatherClient,
 )
-from app.services.assessment_service import (
-    AssessmentService,
+from app.environmental.services.resource_assessment_service import (
+    ResourceAssessmentService,
+)
+from app.repositories.project_repository import ProjectRepository
+from app.repositories.site_repository import SiteRepository
+from app.services.gis_enrichment_service import (
+    GISEnrichmentService,
 )
 from app.services.solar_service import (
     SolarService,
@@ -13,11 +20,16 @@ from app.services.solar_service import (
 from app.services.wind_service import (
     WindService,
 )
-from app.repositories.project_repository import ProjectRepository
-from app.repositories.site_repository import SiteRepository
 
 
 class EnvironmentalService:
+    """
+    Environmental Intelligence Engine.
+
+    Coordinates environmental data collection,
+    GIS enrichment and renewable resource
+    assessment.
+    """
 
     def __init__(
         self,
@@ -27,7 +39,8 @@ class EnvironmentalService:
         nasa_client: NASAPowerClient,
         solar_service: SolarService,
         wind_service: WindService,
-        assessment_service: AssessmentService,
+        resource_assessment_service: ResourceAssessmentService,
+        gis_enrichment_service: GISEnrichmentService,
     ):
 
         self.site_repository = site_repository
@@ -39,7 +52,13 @@ class EnvironmentalService:
         self.solar_service = solar_service
         self.wind_service = wind_service
 
-        self.assessment_service = assessment_service
+        self.resource_assessment_service = (
+            resource_assessment_service
+        )
+
+        self.gis_enrichment_service = (
+            gis_enrichment_service
+        )
 
     def get_environmental_data(
         self,
@@ -57,28 +76,44 @@ class EnvironmentalService:
             longitude,
         )
 
+        gis = self.gis_enrichment_service.enrich_site(
+            latitude,
+            longitude,
+        )
+
         solar_metrics = (
             self.solar_service.calculate_solar_metrics(
-                solar
+                solar,
             )
         )
 
         wind_metrics = (
             self.wind_service.calculate_wind_metrics(
-                weather
+                weather,
             )
         )
 
         assessment = (
-            self.assessment_service.generate_assessment(
-                solar_metrics,
-                wind_metrics,
+            self.resource_assessment_service.generate_report(
+                site=type(
+                    "Site",
+                    (),
+                    {
+                        "name": "Ad-hoc Location",
+                        "latitude": latitude,
+                        "longitude": longitude,
+                    },
+                )(),
+                weather=weather,
+                solar=solar,
+                gis=gis,
             )
         )
 
         return {
             "weather": weather,
             "solar": solar,
+            "gis": gis,
             "solar_metrics": solar_metrics,
             "wind_metrics": wind_metrics,
             "assessment": assessment,
@@ -89,47 +124,95 @@ class EnvironmentalService:
         site_id: int,
     ):
 
-        site = self.site_repository.get_by_id(site_id)
+        site = self.site_repository.get_by_id(
+            site_id,
+        )
 
         if site is None:
-            raise ValueError("Site not found.")
+            raise HTTPException(
+                status_code=404,
+                detail="Site not found.",
+            )
 
-        return self.get_environmental_data(
+        weather = self.weather_client.get_weather(
             site.latitude,
             site.longitude,
         )
+
+        solar = self.nasa_client.get_solar_resource(
+            site.latitude,
+            site.longitude,
+        )
+
+        gis = self.gis_enrichment_service.enrich_site(
+            site.latitude,
+            site.longitude,
+        )
+
+        report = (
+            self.resource_assessment_service.generate_report(
+                site=site,
+                weather=weather,
+                solar=solar,
+                gis=gis,
+            )
+        )
+
+        return report
 
     def get_project_environment(
         self,
         project_id: int,
     ):
 
-        project = self.project_repository.get_by_id(project_id)
-
-        if project is None:
-            raise ValueError("Project not found.")
-
-        sites = self.site_repository.get_by_project(
-            project_id
+        project = self.project_repository.get_by_id(
+            project_id,
         )
 
-        results = []
+        if project is None:
+            raise HTTPException(
+                status_code=404,
+                detail="Project not found.",
+            )
+
+        sites = self.site_repository.get_by_project(
+            project_id,
+        )
+
+        reports = []
 
         for site in sites:
 
-            results.append(
-                {
-                    "site_id": site.id,
-                    "site_name": site.name,
-                    "environment": self.get_environmental_data(
-                        site.latitude,
-                        site.longitude,
-                    ),
-                }
+            weather = self.weather_client.get_weather(
+                site.latitude,
+                site.longitude,
             )
+
+            solar = self.nasa_client.get_solar_resource(
+                site.latitude,
+                site.longitude,
+            )
+
+            gis = (
+                self.gis_enrichment_service.enrich_site(
+                    site.latitude,
+                    site.longitude,
+                )
+            )
+
+            report = (
+                self.resource_assessment_service.generate_report(
+                    site=site,
+                    weather=weather,
+                    solar=solar,
+                    gis=gis,
+                )
+            )
+
+            reports.append(report)
 
         return {
             "project_id": project.id,
             "project_name": project.name,
-            "sites": results,
+            "sites": reports,
         }

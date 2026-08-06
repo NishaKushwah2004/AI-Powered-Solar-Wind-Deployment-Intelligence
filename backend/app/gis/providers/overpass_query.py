@@ -42,6 +42,25 @@ SUBSTATION_QUERY = """
 out center;
 """
 
+WATER_QUERY = """
+[out:json];
+(
+  way(around:{radius},{lat},{lon})["natural"="water"];
+  way(around:{radius},{lat},{lon})["waterway"];
+);
+out center;
+"""
+
+PROTECTED_AREA_QUERY = """
+[out:json];
+(
+  way(around:{radius},{lat},{lon})["boundary"="protected_area"];
+  way(around:{radius},{lat},{lon})["leisure"="nature_reserve"];
+  relation(around:{radius},{lat},{lon})["boundary"="protected_area"];
+);
+out center;
+"""
+
 INFRASTRUCTURE_QUERY = """
 [out:json];
 (

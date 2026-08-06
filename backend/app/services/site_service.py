@@ -96,6 +96,18 @@ class SiteService(BaseService[SiteRepository]):
                 gis_data.nearest_transmission_line_distance
             ),
 
+            water_body_distance=(
+                gis_data.water_body_distance
+            ),
+
+            protected_area_distance=(
+                gis_data.protected_area_distance
+            ),
+
+            land_slope=gis_data.land_slope,
+
+            vegetation_index=gis_data.vegetation_index,
+
             project_id=site_data.project_id,
         )
 
@@ -165,6 +177,22 @@ class SiteService(BaseService[SiteRepository]):
             site.nearest_transmission_line_distance = (
                 site_data.nearest_transmission_line_distance
             )
+
+        if site_data.water_body_distance is not None:
+            site.water_body_distance = (
+                site_data.water_body_distance
+            )
+
+        if site_data.protected_area_distance is not None:
+            site.protected_area_distance = (
+                site_data.protected_area_distance
+            )
+
+        if site_data.land_slope is not None:
+            site.land_slope = site_data.land_slope
+
+        if site_data.vegetation_index is not None:
+            site.vegetation_index = site_data.vegetation_index
 
         return self.repository.update(site)
 

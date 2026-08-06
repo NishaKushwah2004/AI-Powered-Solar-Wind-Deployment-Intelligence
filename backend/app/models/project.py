@@ -1,4 +1,4 @@
-from sqlalchemy import ForeignKey, String, Text
+from sqlalchemy import ForeignKey, String, Text, Index
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base
@@ -16,6 +16,11 @@ if TYPE_CHECKING:
 class Project(Base, TimestampMixin):
     __tablename__ = "projects"
 
+    __table_args__ = (
+        Index("idx_project_region", "region"),
+        Index("idx_project_created_by", "created_by"),
+    )
+
     id: Mapped[int] = mapped_column(
         primary_key=True,
         index=True,
@@ -23,10 +28,9 @@ class Project(Base, TimestampMixin):
 
     name: Mapped[str] = mapped_column(
         String(150),
-        unique=True,
         nullable=False,
     )
-
+    
     description: Mapped[str | None] = mapped_column(
         Text,
         nullable=True,
@@ -43,8 +47,12 @@ class Project(Base, TimestampMixin):
     )
 
     created_by: Mapped[int] = mapped_column(
-        ForeignKey("users.id"),
+        ForeignKey(
+            "users.id",
+            ondelete="CASCADE",
+        ),
         nullable=False,
+        index=True,
     )
 
     owner: Mapped["User"] = relationship(

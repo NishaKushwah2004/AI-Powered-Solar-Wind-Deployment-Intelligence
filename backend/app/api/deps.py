@@ -13,7 +13,10 @@ from app.services.gis_service import GISService
 from app.services.environmental_service import EnvironmentalService
 from app.services.solar_service import SolarService
 from app.services.wind_service import WindService
-from app.services.assessment_service import AssessmentService
+from app.services.gis_enrichment_service import GISEnrichmentService
+from app.environmental.services.resource_assessment_service import (
+    ResourceAssessmentService,
+)
 from app.ml.features.feature_engineering import (
     FeatureEngineering,
 )
@@ -29,7 +32,9 @@ from app.ml.models.suitability_predictor import (
 from app.ml.services.prediction_service import (
     PredictionService,
 )
-from backend.app.services.renewable_intelligence_service import RenewableIntelligenceService
+from app.services.renewable_intelligence_service import (
+    RenewableIntelligenceService,
+)
 
 
 def get_db():
@@ -70,9 +75,37 @@ def get_gis_service(
     )
 
 
+def get_gis_enrichment_service() -> GISEnrichmentService:
+
+    return GISEnrichmentService()
+
+
+def get_solar_service() -> SolarService:
+
+    return SolarService()
+
+
+def get_wind_service() -> WindService:
+
+    return WindService()
+
+
+def get_resource_assessment_service() -> ResourceAssessmentService:
+
+    return ResourceAssessmentService()
+
+
 def get_environmental_service(
     site_repository: SiteRepository = Depends(get_site_repository),
     project_repository: ProjectRepository = Depends(get_project_repository),
+    solar_service: SolarService = Depends(get_solar_service),
+    wind_service: WindService = Depends(get_wind_service),
+    assessment_service: ResourceAssessmentService = Depends(
+        get_resource_assessment_service
+    ),
+    gis_enrichment_service: GISEnrichmentService = Depends(
+        get_gis_enrichment_service
+    ),
 ) -> EnvironmentalService:
 
     return EnvironmentalService(
@@ -80,10 +113,23 @@ def get_environmental_service(
         project_repository=project_repository,
         weather_client=WeatherClient(),
         nasa_client=NASAPowerClient(),
-        solar_service=SolarService(),
-        wind_service=WindService(),
-        assessment_service=AssessmentService(),
+        solar_service=solar_service,
+        wind_service=wind_service,
+        assessment_service=assessment_service,
+        gis_enrichment_service=gis_enrichment_service,
     )
+
+
+def get_resource_assessment_service(
+    solar_service: SolarService = Depends(get_solar_service),
+    wind_service: WindService = Depends(get_wind_service),
+) -> ResourceAssessmentService:
+
+    return ResourceAssessmentService(
+        solar_service=solar_service,
+        wind_service=wind_service,
+    )
+
 
 def get_prediction_service() -> PredictionService:
     return PredictionService(
