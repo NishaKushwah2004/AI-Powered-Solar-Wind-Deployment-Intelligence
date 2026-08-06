@@ -8,3 +8,7 @@ class WeatherServiceError(EnvironmentalException):
 
 class NASAPowerServiceError(EnvironmentalException):
     """Raised when NASA POWER API fails."""
+
+
+class SentinelServiceError(EnvironmentalException):
+    """Raised when the Copernicus Sentinel Hub service fails."""

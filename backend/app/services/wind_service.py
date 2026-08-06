@@ -17,9 +17,37 @@ class WindService:
 
     AIR_DENSITY = 1.225
 
-    PERFORMANCE_COEFFICIENT = 0.40
+    PERFORMANCE_COEFFICIENT = 0.42
 
     HOURS_PER_YEAR = 8760
+
+    CUT_IN_SPEED = 3.0
+    RATED_SPEED = 12.0
+    CUT_OUT_SPEED = 25.0
+
+    def calculate_capacity_factor(
+        self,
+        wind_speed: float,
+    ) -> float:
+        """
+        Estimate turbine capacity factor using
+        a simplified wind turbine power curve.
+        """
+
+        if wind_speed < self.CUT_IN_SPEED:
+            return 0.0
+
+        if wind_speed < self.RATED_SPEED:
+            return round(
+                (wind_speed - self.CUT_IN_SPEED)
+                / (self.RATED_SPEED - self.CUT_IN_SPEED),
+                3,
+            )
+
+        if wind_speed <= self.CUT_OUT_SPEED:
+            return 1.0
+
+        return 0.0
 
     def calculate_wind_metrics(
         self,
@@ -37,28 +65,37 @@ class WindService:
             * (wind_speed ** 3)
         )
 
-        capacity_factor = min(
-            wind_speed / 12,
-            1,
+        capacity_factor = self.calculate_capacity_factor(
+            wind_speed
         )
 
         expected_annual_energy = (
             wind_power_density
             * self.HOURS_PER_YEAR
+            * capacity_factor
             * self.PERFORMANCE_COEFFICIENT
         )
 
         suitability_score = min(
-            (wind_speed / 15) * 100,
+            capacity_factor * 100,
             100,
         )
 
         return WindMetrics(
             average_wind_speed=wind_speed,
-            wind_power_density=wind_power_density,
+            wind_power_density=round(
+                wind_power_density,
+                2,
+            ),
             capacity_factor=capacity_factor,
-            expected_annual_energy=expected_annual_energy,
-            suitability_score=suitability_score,
+            expected_annual_energy=round(
+                expected_annual_energy,
+                2,
+            ),
+            suitability_score=round(
+                suitability_score,
+                2,
+            ),
         )
 
     def calculate_turbulence_intensity(
@@ -66,29 +103,25 @@ class WindService:
         wind_speed: float,
     ) -> float:
         """
-        Estimate turbulence intensity.
+        Estimate turbulence intensity based on
+        average wind speed.
         """
 
         if wind_speed <= 0:
             return 0.0
 
-        turbulence = min(
-            0.10 + (wind_speed / 100),
-            0.30,
-        )
+        if wind_speed < 4:
+            return 0.18
 
-        return round(
-            turbulence,
-            2,
-        )
+        if wind_speed < 8:
+            return 0.14
+
+        return 0.10
 
     def assess_turbine_suitability(
         self,
         wind_speed: float,
     ) -> str:
-        """
-        Recommend turbine suitability based on average wind speed.
-        """
 
         if wind_speed >= 8:
             return "Highly Suitable"
@@ -106,24 +139,24 @@ class WindService:
         annual_energy: float,
     ) -> SeasonalWindForecast:
         """
-        Seasonal distribution of annual wind energy.
+        Seasonal wind generation distribution.
         """
 
         return SeasonalWindForecast(
             spring=round(
-                annual_energy * 0.24,
+                annual_energy * 0.25,
                 2,
             ),
             summer=round(
-                annual_energy * 0.21,
+                annual_energy * 0.20,
                 2,
             ),
             autumn=round(
-                annual_energy * 0.27,
+                annual_energy * 0.28,
                 2,
             ),
             winter=round(
-                annual_energy * 0.28,
+                annual_energy * 0.27,
                 2,
             ),
         )
@@ -132,9 +165,6 @@ class WindService:
         self,
         weather: WeatherResult,
     ) -> WindAssessment:
-        """
-        Generate complete wind assessment.
-        """
 
         metrics = self.calculate_wind_metrics(
             weather,

@@ -1,8 +1,8 @@
 from app.environmental.models.weather_result import WeatherResult
 from app.environmental.models.solar_result import SolarResult
 
-from app.models.solar_metrics import SolarMetrics
-from app.models.wind_metrics import WindMetrics
+from app.environmental.models.solar_metrics import SolarMetrics
+from app.environmental.models.wind_metrics import WindMetrics
 
 
 class FeatureEngineering:

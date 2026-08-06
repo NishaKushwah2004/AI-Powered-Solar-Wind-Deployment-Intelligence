@@ -21,6 +21,19 @@ class Settings(BaseSettings):
     ALGORITHM: str
     ACCESS_TOKEN_EXPIRE_MINUTES: int
 
+    # ----------------------------
+    # Environmental & GIS Data Providers (Milestone 2)
+    # ----------------------------
+
+    OPENWEATHER_API_KEY: str = ""
+
+    # Copernicus Sentinel Hub (used for vegetation index /
+    # land-cover analysis). Optional: when unset the
+    # SentinelClient degrades gracefully and the platform
+    # continues to operate using NASA POWER + OSM + Elevation.
+    SENTINEL_CLIENT_ID: str | None = None
+    SENTINEL_CLIENT_SECRET: str | None = None
+
     model_config = SettingsConfigDict(
         env_file=BASE_DIR / ".env",
         case_sensitive=True,

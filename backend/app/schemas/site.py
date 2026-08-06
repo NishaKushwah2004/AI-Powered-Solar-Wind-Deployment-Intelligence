@@ -87,6 +87,14 @@ class SiteUpdate(BaseSchema):
 
     nearest_transmission_line_distance: Optional[float] = None
 
+    water_body_distance: Optional[float] = None
+
+    protected_area_distance: Optional[float] = None
+
+    land_slope: Optional[float] = None
+
+    vegetation_index: Optional[float] = None
+
     project_id: Optional[int] = None
 
 
@@ -104,3 +112,11 @@ class SiteResponse(SiteBase):
     nearest_substation_distance: Optional[float] = None
 
     nearest_transmission_line_distance: Optional[float] = None
+
+    water_body_distance: Optional[float] = None
+
+    protected_area_distance: Optional[float] = None
+
+    land_slope: Optional[float] = None
+
+    vegetation_index: Optional[float] = None

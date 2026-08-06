@@ -11,6 +11,7 @@ class Geometry(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     type: str = "Point"
+
     coordinates: list[float] = Field(
         ...,
         min_length=2,
@@ -27,6 +28,11 @@ class Feature(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     type: str = "Feature"
+
+    id: int | None = Field(
+        default=None,
+        description="Unique feature identifier.",
+    )
 
     geometry: Geometry
 

@@ -4,3 +4,9 @@ from app.services.project_service import ProjectService
 from app.services.site_service import SiteService
 from app.services.gis_service import GISService
 from app.repositories.project_repository import ProjectRepository
+from app.services.environmental_service import EnvironmentalService
+from app.services.solar_service import SolarService
+from app.services.wind_service import WindService
+from app.services.gis_enrichment_service import GISEnrichmentService
+from app.services.renewable_intelligence_service import RenewableIntelligenceService
+from app.services.dashboard_service import DashboardService

@@ -15,12 +15,16 @@ def require_roles(*allowed_roles: str):
         current_user: User = Depends(get_current_user),
     ) -> User:
 
-        user_role = current_user.role.name
-
-        if user_role not in allowed_roles:
+        if current_user.role is None:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
-                detail="You do not have permission to perform this action.",
+                detail="No role assigned to the user."
+            )
+
+        if current_user.role.name not in allowed_roles:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="You do not have permission to perform this action."
             )
 
         return current_user

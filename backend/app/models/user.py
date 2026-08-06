@@ -40,8 +40,12 @@ class User(Base, TimestampMixin):
     )
 
     role_id: Mapped[int] = mapped_column(
-        ForeignKey("roles.id"),
+        ForeignKey(
+            "roles.id",
+            ondelete="RESTRICT"
+        ),
         nullable=False,
+        index=True,
     )
 
     role: Mapped["Role"] = relationship(

@@ -28,5 +28,4 @@ class Role(Base, TimestampMixin):
 
     users: Mapped[list["User"]] = relationship(
         back_populates="role",
-        cascade="all, delete-orphan",
     )
