@@ -4,36 +4,44 @@ export const ROUTES = {
   LOGIN: "/login",
   REGISTER: "/register",
 
-  // Protected
+  // Dashboard
   DASHBOARD: "/dashboard",
+
   // Projects
   PROJECTS: "/projects",
   PROJECT_CREATE: "/projects/create",
-
-  // Route Pattern (used by React Router)
   PROJECT_EDIT: "/projects/:projectId/edit",
+  projectEdit: (projectId) =>
+    `/projects/${projectId}/edit`,
 
-  // Builder (used with navigate())
-  projectEdit: (projectId) => `/projects/${projectId}/edit`,
-
+  // Sites
   SITES: "/sites",
-
   SITE_CREATE: "/sites/create",
-
   SITE_EDIT: "/sites/:siteId/edit",
+  siteEdit: (siteId) =>
+    `/sites/${siteId}/edit`,
 
-  siteEdit: (siteId) => `/sites/${siteId}/edit`,
-
+  // GIS
   GIS: "/gis",
 
-  PROFILE: "/profile",
+  // Upcoming Modules
+  ENVIRONMENT: "/environment/:siteId",
 
-  // Future Modules
-  SOLAR: "/solar",
-  WIND: "/wind",
-  FORECASTING: "/forecasting",
-  ANALYTICS: "/analytics",
-  REPORTS: "/reports",
+  environment: (siteId) =>
+    `/environment/${siteId}`,
+
+  ASSESSMENT: "/assessment/:siteId",
+
+  assessment: (siteId) =>
+    `/assessment/${siteId}`,
+
+  PREDICTION: "/prediction/:siteId",
+
+  prediction: (siteId) =>
+    `/prediction/${siteId}`,
+
+  // Profile
+  PROFILE: "/profile",
 
   // Errors
   UNAUTHORIZED: "/unauthorized",

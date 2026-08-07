@@ -9,9 +9,7 @@ export default function SiteHeader({
 }) {
   return (
     <div className="mb-8 flex flex-col justify-between gap-4 md:flex-row md:items-center">
-
       <div>
-
         <h1 className="text-3xl font-bold">
           Sites
         </h1>
@@ -19,13 +17,13 @@ export default function SiteHeader({
         <p className="mt-1 text-slate-500">
           Manage project sites.
         </p>
-
       </div>
 
       <div className="flex gap-3">
-
         <Input
           placeholder="Search sites..."
+          aria-label="Search Sites"
+          autoComplete="off"
           value={search}
           onChange={(e) =>
             onSearch(e.target.value)
@@ -33,16 +31,14 @@ export default function SiteHeader({
           leftIcon={<Search size={18} />}
         />
 
-        <Button onClick={onCreate}>
-
+        <Button
+          type="button"
+          onClick={onCreate}
+        >
           <Plus size={18} />
-
           Add Site
-
         </Button>
-
       </div>
-
     </div>
   );
 }

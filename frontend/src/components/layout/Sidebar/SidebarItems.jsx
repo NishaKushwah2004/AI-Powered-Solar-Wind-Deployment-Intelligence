@@ -8,6 +8,7 @@ export default function SidebarItems({ item }) {
   if (item.disabled) {
     return (
       <div
+        aria-disabled="true"
         className={cn(
           "flex items-center gap-3 rounded-xl px-4 py-3",
           "cursor-not-allowed text-slate-400 opacity-60"
@@ -28,6 +29,7 @@ export default function SidebarItems({ item }) {
 
   return (
     <NavLink
+      aria-label={item.title}
       to={item.path}
       className={({ isActive }) =>
         cn(

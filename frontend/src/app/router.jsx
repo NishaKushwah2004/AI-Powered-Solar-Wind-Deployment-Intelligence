@@ -17,6 +17,13 @@ import SitesPage from "@/features/sites/pages/SitesPage";
 import { GISPage } from "@/features/gis";
 import { ProfilePage } from "@/features/profile";
 import RoleGuard from "@/components/layout/RoleGuard";
+import {
+  EnvironmentalPage,
+} from "@/features/environmental";
+
+import {
+  AssessmentPage,
+} from "@/features/assessment";
 
 import {
   CreateSitePage,
@@ -143,6 +150,38 @@ export const router = createBrowserRouter([
       },
 
       {
+        path: ROUTES.ENVIRONMENT,
+        element: (
+          <RoleGuard
+            allowedRoles={[
+              "Admin",
+              "GIS Analyst",
+              "Project Manager",
+              "Renewable Energy Planner",
+            ]}
+          >
+            <EnvironmentalPage />
+          </RoleGuard>
+        ),
+      },
+
+      {
+        path: ROUTES.ASSESSMENT,
+        element: (
+          <RoleGuard
+            allowedRoles={[
+              "Admin",
+              "GIS Analyst",
+              "Project Manager",
+              "Renewable Energy Planner",
+            ]}
+          >
+            <AssessmentPage />
+          </RoleGuard>
+        ),
+      },
+
+      {
         path: ROUTES.PROFILE,
         element: <ProfilePage />,
       },
@@ -151,6 +190,10 @@ export const router = createBrowserRouter([
 
   {
     path: ROUTES.NOT_FOUND,
+    element: <NotFoundPage />,
+  },
+  {
+    path: "*",
     element: <NotFoundPage />,
   },
 ]);

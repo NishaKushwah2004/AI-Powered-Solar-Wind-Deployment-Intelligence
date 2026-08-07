@@ -32,7 +32,7 @@ function Body({ children }) {
 
 function Row({ children }) {
   return (
-    <tr className="border-b hover:bg-slate-50">
+    <tr className="border-b transition-colors hover:bg-slate-50">
       {children}
     </tr>
   );
@@ -40,7 +40,10 @@ function Row({ children }) {
 
 function HeaderCell({ children }) {
   return (
-    <th className="px-6 py-4 text-left text-sm font-semibold">
+    <th
+      scope="col"
+      className="px-6 py-4 text-left text-sm font-semibold"
+    >
       {children}
     </th>
   );

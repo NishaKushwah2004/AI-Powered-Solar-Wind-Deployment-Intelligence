@@ -14,8 +14,9 @@ export default function ErrorCard({
 
       {onRetry && (
         <Button
-          className="mt-5"
-          onClick={onRetry}
+            type="button"
+            className="mt-5"
+            onClick={onRetry}
         >
           Retry
         </Button>

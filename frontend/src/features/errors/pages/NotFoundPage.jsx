@@ -7,10 +7,8 @@ import { ROUTES } from "@/config/navigation/routes";
 export default function NotFoundPage() {
   return (
     <div className="flex min-h-screen items-center justify-center bg-slate-50 px-6">
-
       <div className="max-w-lg text-center">
-
-        <h1 className="text-8xl font-extrabold text-teal-600">
+        <h1 className="text-7xl font-extrabold text-teal-600 md:text-8xl">
           404
         </h1>
 
@@ -19,27 +17,19 @@ export default function NotFoundPage() {
         </h2>
 
         <p className="mt-4 text-slate-600">
-          The page you're looking for doesn't exist or may have been moved.
+          The page you're looking for doesn't exist,
+          may have been moved, or the URL is incorrect.
         </p>
 
         <div className="mt-8">
-
           <Link to={ROUTES.DASHBOARD}>
-
-            <Button>
-
+            <Button type="button">
               <Home size={18} />
-
               Back to Dashboard
-
             </Button>
-
           </Link>
-
         </div>
-
       </div>
-
     </div>
   );
 }

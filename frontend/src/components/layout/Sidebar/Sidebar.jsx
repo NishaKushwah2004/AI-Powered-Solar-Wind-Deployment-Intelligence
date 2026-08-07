@@ -4,7 +4,7 @@ import SidebarItems from "./SidebarItems";
 
 export default function Sidebar() {
   return (
-    <aside className="flex h-screen w-72 flex-col border-r bg-white">
+    <aside className="sticky top-0 flex h-screen w-72 flex-col border-r bg-white">
 
       <div className="border-b p-6">
 

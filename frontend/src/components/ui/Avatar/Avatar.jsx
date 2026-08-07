@@ -6,12 +6,13 @@ export default function Avatar({
   className,
 }) {
   const initials = name
-    .split(" ")
+    .trim()
+    .split(/\s+/)
     .map((word) => word[0])
     .join("")
-    .substring(0, 2)
-    .toUpperCase();
-
+    .slice(0, 2)
+    .toUpperCase() || "?";
+   
   const sizes = {
     sm: "h-8 w-8 text-xs",
     md: "h-10 w-10 text-sm",

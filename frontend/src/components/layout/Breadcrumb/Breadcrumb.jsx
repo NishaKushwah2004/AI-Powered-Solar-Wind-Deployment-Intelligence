@@ -7,12 +7,16 @@ export default function Breadcrumb() {
   const location = useLocation();
 
   const items =
-    breadcrumbs[location.pathname] || [];
+    breadcrumbs[location.pathname] ?? [
+      {
+        label: "Dashboard",
+      },
+    ];
 
   return (
     <nav
-      className="flex items-center gap-2 text-sm text-slate-500"
       aria-label="Breadcrumb"
+      className="flex items-center gap-2 text-sm text-slate-500"
     >
       {items.map((item, index) => (
         <div

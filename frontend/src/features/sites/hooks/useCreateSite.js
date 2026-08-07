@@ -3,19 +3,17 @@ import {
   useQueryClient,
 } from "@tanstack/react-query";
 
-import toast from "react-hot-toast";
+import { toast } from "sonner";
 
 import { QUERY_KEYS } from "@/constants/queryKeys";
 
 import { siteService } from "../services/siteService";
 
 export function useCreateSite() {
-  const queryClient =
-    useQueryClient();
+  const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn:
-      siteService.createSite,
+    mutationFn: siteService.createSite,
 
     onSuccess: () => {
       toast.success(
@@ -23,9 +21,15 @@ export function useCreateSite() {
       );
 
       queryClient.invalidateQueries({
-        queryKey:
-          QUERY_KEYS.SITES,
+        queryKey: QUERY_KEYS.SITES,
       });
+    },
+
+    onError: (error) => {
+      toast.error(
+        error?.response?.data?.detail ??
+          "Unable to create site."
+      );
     },
   });
 }

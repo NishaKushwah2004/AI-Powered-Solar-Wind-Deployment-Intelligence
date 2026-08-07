@@ -1,4 +1,12 @@
-import { useAuth } from "@/features/auth/context/AuthContext";
+import { useAuth } from "@/features/auth/context/useAuth";
+
+function getGreeting() {
+  const hour = new Date().getHours();
+
+  if (hour < 12) return "Good Morning";
+  if (hour < 17) return "Good Afternoon";
+  return "Good Evening";
+}
 
 export default function DashboardHeader() {
   const { user } = useAuth();
@@ -6,7 +14,8 @@ export default function DashboardHeader() {
   return (
     <div className="mb-8">
       <h1 className="text-3xl font-bold">
-        Welcome, {user.full_name}
+        {getGreeting()},{" "}
+        {user?.full_name ?? "User"}
       </h1>
 
       <p className="mt-2 text-slate-500">
@@ -14,7 +23,7 @@ export default function DashboardHeader() {
       </p>
 
       <p className="mt-1 text-sm text-slate-400">
-        Role: {user.role.name}
+        Role: {user?.role?.name ?? "-"}
       </p>
     </div>
   );

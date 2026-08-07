@@ -9,5 +9,12 @@ export function useMapSummary() {
     queryKey: QUERY_KEYS.GIS_SUMMARY,
 
     queryFn: gisService.getSummary,
+
+    staleTime: 1000 * 60 * 5,
+    gcTime: 1000 * 60 * 10,
+
+    retry: 1,
+
+    refetchOnWindowFocus: false,
   });
 }

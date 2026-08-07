@@ -1,10 +1,10 @@
 import { Navigate } from "react-router-dom";
 
 import { ROUTES } from "@/config/navigation/routes";
-import { useAuth } from "@/features/auth/context/AuthContext";
+import { useAuth } from "@/features/auth/context/useAuth";
 
 export default function RoleGuard({
-  allowedRoles,
+  allowedRoles = [],
   children,
 }) {
   const { user } = useAuth();

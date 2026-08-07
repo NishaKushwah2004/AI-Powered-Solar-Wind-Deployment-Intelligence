@@ -30,4 +30,22 @@ export const breadcrumbs = {
       label: "Profile",
     },
   ],
+
+  [ROUTES.ENVIRONMENTAL]: [
+    {
+      label: "Environmental",
+    },
+  ],
+
+  [ROUTES.ASSESSMENT]: [
+    {
+      label: "Assessment",
+    },
+  ],
+
+  [ROUTES.PREDICTION]: [
+    {
+      label: "Prediction",
+    },
+  ],
 };

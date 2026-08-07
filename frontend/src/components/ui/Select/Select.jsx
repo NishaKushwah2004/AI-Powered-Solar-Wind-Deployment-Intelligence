@@ -2,7 +2,11 @@ import { forwardRef } from "react";
 
 import FormField from "@/components/ui/FormField";
 import { cn } from "@/utils/cn";
-import { FORM_CONTROL, FORM_CONTROL_ERROR } from "@/constants/formStyles";
+
+import {
+  FORM_CONTROL,
+  FORM_CONTROL_ERROR,
+} from "@/constants/formStyles";
 
 const Select = forwardRef(
   (
@@ -19,6 +23,10 @@ const Select = forwardRef(
     },
     ref
   ) => {
+    const errorId = error
+      ? `${id}-error`
+      : undefined;
+
     return (
       <FormField
         id={id}
@@ -30,15 +38,19 @@ const Select = forwardRef(
         <select
           ref={ref}
           id={id}
+          aria-invalid={!!error}
+          aria-describedby={errorId}
           className={cn(
             FORM_CONTROL,
             error && FORM_CONTROL_ERROR,
             className
           )}
-          aria-invalid={!!error}
           {...props}
         >
-          <option value="">
+          <option
+            value=""
+            disabled
+          >
             {placeholder}
           </option>
 

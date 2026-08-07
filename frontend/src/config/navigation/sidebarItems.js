@@ -6,8 +6,6 @@ import {
   Sun,
   Wind,
   ChartSpline,
-  BarChart3,
-  FileText,
   User,
 } from "lucide-react";
 
@@ -62,27 +60,9 @@ export const sidebarItems = [
         icon: Wind,
         disabled: true,
       },
-
       {
-        title: "Forecasting",
+        title: "Prediction",
         icon: ChartSpline,
-        disabled: true,
-      },
-
-      {
-        title: "Analytics",
-        icon: BarChart3,
-        disabled: true,
-      },
-    ],
-  },
-
-  {
-    title: "Reports",
-    items: [
-      {
-        title: "Reports",
-        icon: FileText,
         disabled: true,
       },
     ],

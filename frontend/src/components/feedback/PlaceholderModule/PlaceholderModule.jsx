@@ -23,8 +23,13 @@ export default function PlaceholderModule({
         {description}
       </p>
 
-      <Button className="mt-6" variant="outline">
-        Available in Milestone {milestone}
+      <Button
+          type="button"
+          variant="outline"
+          disabled
+          className="mt-6"
+      >
+          Available in Milestone {milestone}
       </Button>
 
     </div>
