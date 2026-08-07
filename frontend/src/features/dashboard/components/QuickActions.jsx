@@ -22,39 +22,67 @@ export default function QuickActions() {
       <div className="flex flex-wrap gap-4">
         {(role === "Admin" ||
           role === "Project Manager") && (
-          <Button
-            onClick={() =>
-              navigate(ROUTES.PROJECTS)
-            }
-          >
-            New Project
-          </Button>
-        )}
+          <>
+            <Button
+              onClick={() =>
+                navigate(ROUTES.PROJECTS)
+              }
+            >
+              Projects
+            </Button>
 
-        {(role === "Admin" ||
-          role === "Project Manager") && (
-          <Button
-            variant="secondary"
-            onClick={() =>
-              navigate(ROUTES.SITES)
-            }
-          >
-            Add Site
-          </Button>
+            <Button
+              variant="secondary"
+              onClick={() =>
+                navigate(ROUTES.SITES)
+              }
+            >
+              Sites
+            </Button>
+          </>
         )}
 
         {(role === "Admin" ||
           role === "GIS Analyst" ||
           role ===
             "Renewable Energy Planner") && (
-          <Button
-            variant="outline"
-            onClick={() =>
-              navigate(ROUTES.GIS)
-            }
-          >
-            Open GIS
-          </Button>
+          <>
+            <Button
+              variant="outline"
+              onClick={() =>
+                navigate(ROUTES.GIS)
+              }
+            >
+              GIS
+            </Button>
+
+            <Button
+              variant="outline"
+              onClick={() =>
+                navigate(ROUTES.SITES)
+              }
+            >
+              Environmental
+            </Button>
+
+            <Button
+              variant="outline"
+              onClick={() =>
+                navigate(ROUTES.SITES)
+              }
+            >
+              Assessment
+            </Button>
+
+            <Button
+              variant="outline"
+              onClick={() =>
+                navigate(ROUTES.SITES)
+              }
+            >
+              Prediction
+            </Button>
+          </>
         )}
       </div>
     </div>

@@ -51,6 +51,7 @@ export default function SiteTableRow({
             size="sm"
             variant="outline"
             title="Edit Site"
+            aria-label="Edit Site"
             onClick={() => onEdit(site)}
           >
             <Pencil size={16} />
@@ -60,9 +61,8 @@ export default function SiteTableRow({
             size="sm"
             variant="success"
             title="Environmental Analysis"
-            onClick={() =>
-              onEnvironment(site)
-            }
+            aria-label="Environmental Analysis"
+            onClick={() => onEnvironment(site)}
           >
             <Leaf size={16} />
           </Button>
@@ -70,10 +70,9 @@ export default function SiteTableRow({
           <Button
             size="sm"
             variant="primary"
-            title="Assessment"
-            onClick={() =>
-              onAssessment(site)
-            }
+            title="Resource Assessment"
+            aria-label="Resource Assessment"
+            onClick={() => onAssessment(site)}
           >
             <BarChart3 size={16} />
           </Button>
@@ -82,9 +81,8 @@ export default function SiteTableRow({
             size="sm"
             variant="secondary"
             title="Prediction"
-            onClick={() =>
-              onPrediction(site)
-            }
+            aria-label="Prediction"
+            onClick={() => onPrediction(site)}
           >
             <Zap size={16} />
           </Button>
@@ -93,9 +91,8 @@ export default function SiteTableRow({
             size="sm"
             variant="danger"
             title="Delete Site"
-            onClick={() =>
-              onDelete(site)
-            }
+            aria-label="Delete Site"
+            onClick={() => onDelete(site)}
           >
             <Trash2 size={16} />
           </Button>

@@ -45,12 +45,30 @@ export default function DashboardPage() {
   }
 
   return (
-    <>
+    <div className="space-y-8">
       <DashboardHeader />
 
       <KPIGrid summary={data} />
 
       <QuickActions />
-    </>
+
+      <Card>
+        <Card.Header>
+          <h2 className="text-lg font-semibold">
+            Platform Overview
+          </h2>
+        </Card.Header>
+
+        <Card.Body>
+          <p className="text-slate-600">
+            Milestone 2 is complete. You can now manage
+            renewable energy projects, analyze environmental
+            conditions, generate GIS-based resource
+            assessments, and run AI-powered solar and wind
+            predictions for registered sites.
+          </p>
+        </Card.Body>
+      </Card>
+    </div>
   );
 }

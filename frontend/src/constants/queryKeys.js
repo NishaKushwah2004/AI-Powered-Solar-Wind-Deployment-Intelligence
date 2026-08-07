@@ -11,45 +11,20 @@ export const QUERY_KEYS = {
 
   PROFILE: ["profile"],
 
-  // GIS
   GIS_SITES: ["gis", "sites"],
   GIS_SUMMARY: ["gis", "summary"],
   GIS_CONFIG: ["gis", "config"],
 
-  // Environmental
   ENVIRONMENTAL: ["environmental"],
-  SITE_ENVIRONMENT: (siteId) => [
-    "environmental",
-    "site",
-    siteId,
-  ],
-  PROJECT_ENVIRONMENT: (projectId) => [
-    "environmental",
-    "project",
-    projectId,
-  ],
-
-  // Assessment
   ASSESSMENT: ["assessment"],
-  SITE_ASSESSMENT: (siteId) => [
-    "assessment",
-    "site",
-    siteId,
-  ],
-  PROJECT_ASSESSMENT: (projectId) => [
-    "assessment",
-    "project",
-    projectId,
-  ],
 
-  // Prediction
-  PREDICTION: ["prediction"],
-  SITE_PREDICTION: (siteId) => [
+  PREDICTION_SITE: (siteId) => [
     "prediction",
     "site",
     siteId,
   ],
-  PROJECT_PREDICTION: (projectId) => [
+
+  PREDICTION_PROJECT: (projectId) => [
     "prediction",
     "project",
     projectId,

@@ -14,16 +14,19 @@ export default function DashboardHeader() {
   return (
     <div className="mb-8">
       <h1 className="text-3xl font-bold">
-        {getGreeting()},{" "}
+        {getGreeting()},
+        {" "}
         {user?.full_name ?? "User"}
       </h1>
 
       <p className="mt-2 text-slate-500">
-        Renewable Energy Deployment Intelligence Dashboard
+        AI-Powered Solar & Wind Deployment Intelligence Platform
       </p>
 
       <p className="mt-1 text-sm text-slate-400">
-        Role: {user?.role?.name ?? "-"}
+        Welcome back. Use the dashboard to manage projects,
+        analyze sites, generate assessments and renewable
+        energy predictions.
       </p>
     </div>
   );

@@ -1,8 +1,6 @@
 
 export { default as AssessmentHeader } from "./AssessmentHeader";
 export { default as AssessmentOverview } from "./AssessmentOverview";
-
-export { default as OverallScoreCard } from "./OverallScoreCard";
 export { default as RecommendationCard } from "./RecommendationCard";
 export { default as SolarAssessmentCard } from "./SolarAssessmentCard";
 export { default as WindAssessmentCard } from "./WindAssessmentCard";

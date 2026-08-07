@@ -1,8 +1,6 @@
 import Card from "@/components/ui/Card";
 
-export default function ResourceRadarChart({
-  metrics,
-}) {
+export default function ResourceRadarChart() {
   return (
     <Card>
 

@@ -3,8 +3,8 @@ import {
   FolderKanban,
   MapPinned,
   Map,
-  Sun,
-  Wind,
+  Leaf,
+  BarChart3,
   ChartSpline,
   User,
 } from "lucide-react";
@@ -50,20 +50,21 @@ export const sidebarItems = [
     title: "Intelligence",
     items: [
       {
-        title: "Solar Intelligence",
-        icon: Sun,
-        disabled: true,
+        title: "Environmental",
+        icon: Leaf,
+        path: ROUTES.ENVIRONMENT,
       },
 
       {
-        title: "Wind Intelligence",
-        icon: Wind,
-        disabled: true,
+        title: "Assessment",
+        icon: BarChart3,
+        path: ROUTES.ASSESSMENT,
       },
+
       {
         title: "Prediction",
         icon: ChartSpline,
-        disabled: true,
+        path: ROUTES.PREDICTION,
       },
     ],
   },

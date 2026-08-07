@@ -40,6 +40,8 @@ import {
   EditProjectPage,
 } from "@/features/projects";
 
+import { PredictionPage } from "@/features/prediction";
+
 
 export const router = createBrowserRouter([
   {
@@ -179,6 +181,11 @@ export const router = createBrowserRouter([
             <AssessmentPage />
           </RoleGuard>
         ),
+      },
+
+      {
+        path: ROUTES.PREDICTION,
+        element: <PredictionPage />,
       },
 
       {

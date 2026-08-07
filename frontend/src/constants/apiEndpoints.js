@@ -55,4 +55,10 @@ export const API_ENDPOINTS = {
     PROJECT: (projectId) =>
       `/assessment/projects/${projectId}/report`,
   },
+
+  PREDICTION: {
+    SITE: (siteId) => `/predictions/sites/${siteId}`,
+    PROJECT: (projectId) =>
+      `/predictions/projects/${projectId}`,
+  },
 };
