@@ -1,7 +1,7 @@
 from datetime import datetime, timedelta, timezone
-from http.client import HTTPException
 
-from jose import JWTError, ExpiredSignatureError, jwt
+from fastapi import HTTPException, status
+from jose import ExpiredSignatureError, JWTError, jwt
 
 from app.core.config import settings
 
@@ -13,17 +13,25 @@ def create_access_token(
     """
     Create a signed JWT access token.
     """
+
     to_encode = data.copy()
 
-    expire = datetime.now(timezone.utc) + (
-        expires_delta
-        if expires_delta
-        else timedelta(
-            minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES
+    expire = (
+        datetime.now(timezone.utc)
+        + (
+            expires_delta
+            if expires_delta
+            else timedelta(
+                minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES,
+            )
         )
     )
 
-    to_encode.update({"exp": expire})
+    to_encode.update(
+        {
+            "exp": expire,
+        }
+    )
 
     return jwt.encode(
         to_encode,
@@ -32,25 +40,39 @@ def create_access_token(
     )
 
 
-def decode_access_token(token: str):
+def decode_access_token(
+    token: str,
+) -> dict:
+    """
+    Decode and validate a JWT access token.
+    """
+
     try:
+
         payload = jwt.decode(
             token,
             settings.SECRET_KEY,
-            algorithms=[settings.ALGORITHM]
+            algorithms=[settings.ALGORITHM],
         )
+
         return payload
 
-    except ExpiredSignatureError:
+    except ExpiredSignatureError as exc:
+
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Access token has expired.",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
+            detail="Access token has expired. Please log in again.",
+            headers={
+                "WWW-Authenticate": "Bearer",
+            },
+        ) from exc
 
-    except JWTError:
+    except JWTError as exc:
+
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid authentication token.",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
+            headers={
+                "WWW-Authenticate": "Bearer",
+            },
+        ) from exc

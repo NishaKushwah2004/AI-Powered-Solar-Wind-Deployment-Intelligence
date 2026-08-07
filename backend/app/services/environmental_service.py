@@ -14,13 +14,6 @@ from app.repositories.site_repository import SiteRepository
 from app.services.gis_enrichment_service import (
     GISEnrichmentService,
 )
-from app.services.solar_service import (
-    SolarService,
-)
-from app.services.wind_service import (
-    WindService,
-)
-
 
 class EnvironmentalService:
     """
@@ -37,8 +30,6 @@ class EnvironmentalService:
         project_repository: ProjectRepository,
         weather_client: WeatherClient,
         nasa_client: NASAPowerClient,
-        solar_service: SolarService,
-        wind_service: WindService,
         resource_assessment_service: ResourceAssessmentService,
         gis_enrichment_service: GISEnrichmentService,
     ):
@@ -48,9 +39,6 @@ class EnvironmentalService:
 
         self.weather_client = weather_client
         self.nasa_client = nasa_client
-
-        self.solar_service = solar_service
-        self.wind_service = wind_service
 
         self.resource_assessment_service = (
             resource_assessment_service
@@ -81,18 +69,6 @@ class EnvironmentalService:
             longitude,
         )
 
-        solar_metrics = (
-            self.solar_service.calculate_solar_metrics(
-                solar,
-            )
-        )
-
-        wind_metrics = (
-            self.wind_service.calculate_wind_metrics(
-                weather,
-            )
-        )
-
         assessment = (
             self.resource_assessment_service.generate_report(
                 site=type(
@@ -114,8 +90,6 @@ class EnvironmentalService:
             "weather": weather,
             "solar": solar,
             "gis": gis,
-            "solar_metrics": solar_metrics,
-            "wind_metrics": wind_metrics,
             "assessment": assessment,
         }
 
@@ -158,7 +132,13 @@ class EnvironmentalService:
             )
         )
 
-        return report
+        return {
+            "site": site,
+            "weather": weather,
+            "solar": solar,
+            "gis": gis,
+            "assessment": report,
+        }
 
     def get_project_environment(
         self,
@@ -209,7 +189,15 @@ class EnvironmentalService:
                 )
             )
 
-            reports.append(report)
+            reports.append(
+                {
+                    "site": site,
+                    "weather": weather,
+                    "solar": solar,
+                    "gis": gis,
+                    "assessment": report,
+                }
+            )
 
         return {
             "project_id": project.id,
