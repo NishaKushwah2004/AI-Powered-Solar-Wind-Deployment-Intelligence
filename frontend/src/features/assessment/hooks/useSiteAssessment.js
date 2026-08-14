@@ -5,15 +5,12 @@ import { QUERY_KEYS } from "@/constants/queryKeys";
 import { assessmentService } from "../services/assessmentService";
 
 export function useSiteAssessment(siteId) {
-  return useQuery({
-    queryKey: [
-      ...QUERY_KEYS.ASSESSMENT,
-      "site",
-      siteId,
-    ],
+  console.log("Hook siteId:", siteId);
 
-    queryFn: () =>
-      assessmentService.getSiteReport(siteId),
+  return useQuery({
+    queryKey: QUERY_KEYS.SITE_ASSESSMENT(siteId),
+
+    queryFn: () => assessmentService.getSiteReport(siteId),
 
     enabled: Boolean(siteId),
 

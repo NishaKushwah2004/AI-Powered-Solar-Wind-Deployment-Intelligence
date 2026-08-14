@@ -1,63 +1,85 @@
-from app.environmental.models.solar_result import SolarResult
-from app.environmental.models.weather_result import WeatherResult
-from app.prediction.models.solar_prediction import SolarPrediction
-from app.services.solar_service import SolarService
+from __future__ import annotations
+
+from typing import Any
+
+from ml_core.preprocessing.feature_preparation import prepare_prediction_record
+from app.ml.inference.model_loader import MLModelLoader
+from app.schemas.ml_prediction import (
+    SolarPredictionRequest,
+    PredictionResponse,
+)
 
 
 class SolarPredictor:
     """
-    Solar prediction adapter.
+    Solar ML inference adapter.
 
-    This class delegates all solar prediction logic to
-    SolarService, ensuring there is a single source of
-    truth for solar calculations.
+    Responsibilities:
+        - accept the authoritative solar prediction request
+        - build the exact ML feature record
+        - delegate inference to the ML model loader
+        - return the model prediction
 
-    In future, this adapter can be replaced with an
-    ML model (Random Forest, XGBoost, TensorFlow, etc.)
-    without changing the PredictionService API.
+    This class MUST NOT:
+        - call SolarService
+        - calculate heuristic capacity factors
+        - calculate panel efficiency
+        - calculate shading
+        - calculate energy using hard-coded formulas
+        - provide an ML fallback
     """
+
+    domain = "solar"
 
     def __init__(
         self,
-        solar_service: SolarService,
-    ):
-        self.solar_service = solar_service
+        model_loader: MLModelLoader,
+    ) -> None:
+        self.model_loader = model_loader
 
     def predict(
         self,
-        weather: WeatherResult,
-        solar: SolarResult,
-    ) -> SolarPrediction:
+        data: SolarPredictionRequest,
+    ) -> PredictionResponse:
         """
-        Generate a solar prediction using SolarService.
+        Execute solar ML inference.
         """
 
-        assessment = (
-            self.solar_service.generate_solar_assessment(
-                weather,
-                solar,
-            )
+        record: dict[str, Any] = {
+            "latitude": data.latitude,
+            "longitude": data.longitude,
+            "ghi": data.ghi,
+            "dni": data.dni,
+            "dhi": data.dhi,
+            "gti": data.gti,
+            "temperature_c": data.temperature_c,
+            "humidity_pct": data.humidity_pct,
+            "cloud_cover_pct": data.cloud_cover_pct,
+            "pressure_hpa": data.pressure_hpa,
+            "wind_speed_m_s": data.wind_speed_m_s,
+            "elevation_m": data.elevation_m,
+        }
+
+        # Uses the authoritative feature contract and guarantees
+        # the correct feature ordering.
+        prepare_prediction_record(
+            record,
+            self.domain,
         )
 
-        confidence = 0.95
-
-        if weather.cloud_cover is not None:
-            confidence -= min(
-                weather.cloud_cover / 100 * 0.05,
-                0.05,
-            )
-
-        if solar.ghi is None:
-            confidence -= 0.15
-
-        confidence = max(
-            round(confidence, 2),
-            0.70,
+        result = self.model_loader.predict(
+            record,
+            self.domain,
         )
 
-        return SolarPrediction(
-            predicted_capacity_factor=assessment.metrics.capacity_factor,
-            predicted_energy_output=assessment.metrics.expected_energy_output,
-            panel_efficiency=assessment.panel_efficiency,
-            confidence=confidence,
+        return PredictionResponse(
+            domain=self.domain,
+            prediction_mw=float(result["prediction"]),
+            model_version=str(result["model_version"]),
+            data_source=str(
+                result.get(
+                    "data_source",
+                    "synthetic_reference",
+                )
+            ),
         )

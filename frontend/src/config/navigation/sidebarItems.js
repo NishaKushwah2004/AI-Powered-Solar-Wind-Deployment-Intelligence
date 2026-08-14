@@ -7,13 +7,27 @@ import {
   BarChart3,
   ChartSpline,
   User,
+  SunMedium,
+  Gauge,
+  Zap,
+  TrendingUp,
+  WalletCards,
+  BriefcaseBusiness,
+  Target,
 } from "lucide-react";
 
 import { ROUTES } from "./routes";
 
+
 export const sidebarItems = [
+
+  // ============================================================
+  // OVERVIEW
+  // ============================================================
+
   {
     title: "Overview",
+
     items: [
       {
         title: "Dashboard",
@@ -23,8 +37,14 @@ export const sidebarItems = [
     ],
   },
 
+
+  // ============================================================
+  // PLANNING
+  // ============================================================
+
   {
     title: "Planning",
+
     items: [
       {
         title: "Projects",
@@ -46,8 +66,14 @@ export const sidebarItems = [
     ],
   },
 
+
+  // ============================================================
+  // EXISTING INTELLIGENCE
+  // ============================================================
+
   {
     title: "Intelligence",
+
     items: [
       {
         title: "Environmental",
@@ -69,8 +95,112 @@ export const sidebarItems = [
     ],
   },
 
+
+  // ============================================================
+  // DEPLOYMENT INTELLIGENCE
+  // ============================================================
+
+  {
+    title: "Deployment Intelligence",
+
+    items: [
+
+      {
+        title: "Site Suitability",
+        icon: Target,
+        path: ROUTES.SUITABILITY,
+      },
+
+      {
+        title: "Site Scoring",
+        icon: Gauge,
+        path: ROUTES.SITE_SCORING,
+      },
+
+      {
+        title: "Renewable Recommendation",
+        icon: SunMedium,
+        path: ROUTES.RENEWABLE_RECOMMENDATION,
+      },
+
+      {
+        title: "Deployment Optimization",
+        icon: Zap,
+        path: ROUTES.DEPLOYMENT_OPTIMIZATION,
+      },
+
+      {
+        title: "Energy Forecasting",
+        icon: TrendingUp,
+        path: ROUTES.ENERGY_FORECASTING,
+      },
+
+      {
+        title: "Investment",
+        icon: WalletCards,
+        path: ROUTES.INVESTMENT,
+      },
+    ],
+  },
+
+
+  // ============================================================
+  // ROLE DASHBOARDS
+  // ============================================================
+
+  {
+    title: "Role Dashboards",
+
+    items: [
+
+      {
+        title: "Energy Planner",
+        icon: SunMedium,
+        path: ROUTES.PLANNER_DASHBOARD,
+
+        roles: [
+          "Renewable Energy Planner",
+          "Project Manager",
+          "Admin",
+        ],
+      },
+
+
+      {
+        title: "GIS Analyst",
+        icon: Target,
+        path: ROUTES.GIS_ANALYST_DASHBOARD,
+
+        roles: [
+          "GIS Analyst",
+          "Project Manager",
+          "Admin",
+        ],
+      },
+
+
+      {
+        title: "Project Manager",
+        icon: BriefcaseBusiness,
+        path: ROUTES.PROJECT_MANAGER_DASHBOARD,
+
+        roles: [
+          "Project Manager",
+          "Admin",
+        ],
+      },
+
+    ],
+  },
+
+
+  // ============================================================
+  // ACCOUNT
+  // ============================================================
+
   {
     title: "Account",
+
     items: [
       {
         title: "Profile",
@@ -79,4 +209,5 @@ export const sidebarItems = [
       },
     ],
   },
+
 ];

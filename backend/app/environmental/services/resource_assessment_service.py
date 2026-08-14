@@ -1,8 +1,10 @@
-from app.environmental.models.resource_assessment_report import (
-    ResourceAssessmentReport,
-)
+from __future__ import annotations
+
 from app.environmental.models.resource_assessment import (
     ResourceAssessment,
+)
+from app.environmental.models.resource_assessment_report import (
+    ResourceAssessmentReport,
 )
 
 from app.services.solar_service import SolarService
@@ -11,15 +13,26 @@ from app.services.wind_service import WindService
 
 class ResourceAssessmentService:
     """
-    Generates a comprehensive renewable resource assessment report.
+    Resource Assessment Engine.
 
-    Uses weighted scoring inspired by the project specification:
-        Renewable Resource      : 35%
-        Geographic Suitability  : 25%
-        Infrastructure          : 15%
-        Environmental           : 15%
-        Economic Feasibility    : 10%
+    Responsibility:
+        - Combine solar and wind resource results.
+        - Incorporate GIS suitability.
+        - Incorporate environmental conditions.
+        - Produce a unified resource assessment.
+
+    This service does NOT perform ML prediction.
+    ML prediction is handled by PredictionService/predictors.
     """
+
+    RENEWABLE_WEIGHT = 0.35
+    GEOGRAPHIC_WEIGHT = 0.25
+    INFRASTRUCTURE_WEIGHT = 0.15
+    ENVIRONMENTAL_WEIGHT = 0.15
+    ECONOMIC_WEIGHT = 0.10
+
+    DEFAULT_GIS_SCORE = 60.0
+    DEFAULT_INFRASTRUCTURE_SCORE = 60.0
 
     def __init__(
         self,
@@ -29,56 +42,124 @@ class ResourceAssessmentService:
         self.solar_service = solar_service
         self.wind_service = wind_service
 
-    # ---------------------------------------------------------
-    # Helper methods
-    # ---------------------------------------------------------
+    # =========================================================
+    # SCORE CALCULATIONS
+    # =========================================================
 
+    @staticmethod
     def _renewable_score(
-        self,
         solar_cf: float,
         wind_cf: float,
     ) -> float:
-        return (
-            ((solar_cf * 100) + (wind_cf * 100))
-            / 2
+        """
+        Convert solar/wind capacity factors into
+        a combined 0-100 renewable resource score.
+        """
+
+        solar_score = max(
+            0.0,
+            min(100.0, solar_cf * 100),
         )
 
+        wind_score = max(
+            0.0,
+            min(100.0, wind_cf * 100),
+        )
+
+        return round(
+            (solar_score + wind_score) / 2,
+            2,
+        )
+
+    @staticmethod
     def _environmental_score(
-        self,
         weather,
     ) -> float:
+        """
+        Calculate an environmental score from
+        available weather indicators.
+
+        Missing values do not automatically reduce
+        the score.
+        """
 
         score = 100.0
 
-        if weather.cloud_cover is not None:
-            score -= weather.cloud_cover * 0.3
+        cloud_cover = getattr(
+            weather,
+            "cloud_cover",
+            None,
+        )
 
-        if weather.rainfall is not None:
-            score -= min(weather.rainfall * 0.2, 20)
+        rainfall = getattr(
+            weather,
+            "rainfall",
+            None,
+        )
 
-        return max(score, 0)
+        if cloud_cover is not None:
+            score -= min(
+                max(float(cloud_cover), 0.0) * 0.3,
+                30.0,
+            )
 
+        if rainfall is not None:
+            score -= min(
+                max(float(rainfall), 0.0) * 0.2,
+                20.0,
+            )
+
+        return round(
+            max(score, 0.0),
+            2,
+        )
+
+    @staticmethod
     def _economic_score(
-        self,
         infrastructure_score: float,
         geographic_score: float,
     ) -> float:
         """
-        Estimate economic feasibility from
-        infrastructure accessibility and
-        geographic suitability.
+        Baseline economic feasibility proxy.
+
+        This is intentionally isolated so that it can later
+        be replaced by an ML/economic feasibility model.
         """
 
         return round(
-            (
-                infrastructure_score * 0.7
-                + geographic_score * 0.3
-            ),
+            infrastructure_score * 0.7
+            + geographic_score * 0.3,
             2,
         )
 
-    def _classify_score(
+    def _overall_score(
         self,
+        renewable: float,
+        geographic: float,
+        infrastructure: float,
+        environmental: float,
+        economic: float,
+    ) -> float:
+
+        score = (
+            renewable * self.RENEWABLE_WEIGHT
+            + geographic * self.GEOGRAPHIC_WEIGHT
+            + infrastructure * self.INFRASTRUCTURE_WEIGHT
+            + environmental * self.ENVIRONMENTAL_WEIGHT
+            + economic * self.ECONOMIC_WEIGHT
+        )
+
+        return round(
+            max(0.0, min(100.0, score)),
+            2,
+        )
+
+    # =========================================================
+    # CLASSIFICATION
+    # =========================================================
+
+    @staticmethod
+    def _classify_score(
         score: float,
     ) -> str:
 
@@ -93,9 +174,8 @@ class ResourceAssessmentService:
 
         return "Low"
 
-
+    @staticmethod
     def _energy_source(
-        self,
         solar_cf: float,
         wind_cf: float,
     ) -> str:
@@ -111,28 +191,8 @@ class ResourceAssessmentService:
 
         return "Wind"
 
-    def _overall_score(
-        self,
-        renewable: float,
-        geographic: float,
-        infrastructure: float,
-        environmental: float,
-        economic: float,
-    ) -> float:
-
-        return round(
-            (
-                renewable * 0.35
-                + geographic * 0.25
-                + infrastructure * 0.15
-                + environmental * 0.15
-                + economic * 0.10
-            ),
-            2,
-        )
-
+    @staticmethod
     def _recommendation(
-        self,
         overall_score: float,
     ) -> str:
 
@@ -153,31 +213,46 @@ class ResourceAssessmentService:
 
         if overall_score >= 50:
             return (
-                "Moderately Suitable - Detailed Feasibility Study Recommended"
+                "Moderately Suitable - Detailed Feasibility "
+                "Study Recommended"
             )
 
         return "Further Site Investigation Required"
 
+    # =========================================================
+    # CONFIDENCE
+    # =========================================================
+
+    @staticmethod
     def _confidence_score(
-        self,
         weather,
         solar,
         gis,
     ) -> float:
         """
-        Estimate confidence based on the availability
-        of environmental and GIS data.
+        Calculate data availability confidence.
+
+        This is data-quality confidence, not ML prediction
+        confidence.
         """
 
         confidence = 1.0
 
-        if weather.cloud_cover is None:
+        if getattr(
+            weather,
+            "cloud_cover",
+            None,
+        ) is None:
             confidence -= 0.05
 
         if gis is None:
             confidence -= 0.10
 
-        if solar.ghi is None:
+        if getattr(
+            solar,
+            "ghi",
+            None,
+        ) is None:
             confidence -= 0.15
 
         return round(
@@ -185,9 +260,49 @@ class ResourceAssessmentService:
             2,
         )
 
-    # ---------------------------------------------------------
-    # Main report generation
-    # ---------------------------------------------------------
+    # =========================================================
+    # GIS
+    # =========================================================
+
+    def _get_gis_scores(
+        self,
+        gis,
+    ) -> tuple[float, float]:
+
+        if gis is None:
+            return (
+                self.DEFAULT_GIS_SCORE,
+                self.DEFAULT_INFRASTRUCTURE_SCORE,
+            )
+
+        geographic_score = getattr(
+            gis,
+            "gis_score",
+            None,
+        )
+
+        infrastructure_score = getattr(
+            gis,
+            "infrastructure_score",
+            None,
+        )
+
+        if geographic_score is None:
+            geographic_score = self.DEFAULT_GIS_SCORE
+
+        if infrastructure_score is None:
+            infrastructure_score = (
+                self.DEFAULT_INFRASTRUCTURE_SCORE
+            )
+
+        return (
+            float(geographic_score),
+            float(infrastructure_score),
+        )
+
+    # =========================================================
+    # MAIN
+    # =========================================================
 
     def generate_report(
         self,
@@ -195,7 +310,6 @@ class ResourceAssessmentService:
         weather,
         solar,
         gis=None,
-        resource_metrics=None,
     ) -> ResourceAssessmentReport:
 
         solar_assessment = (
@@ -211,32 +325,28 @@ class ResourceAssessmentService:
             )
         )
 
-        renewable_score = self._renewable_score(
-            solar_assessment.metrics.capacity_factor,
-            wind_assessment.metrics.capacity_factor,
+        solar_cf = float(
+            solar_assessment.metrics.capacity_factor
         )
 
-        if gis is not None:
+        wind_cf = float(
+            wind_assessment.metrics.capacity_factor
+        )
 
-            geographic_score = (
-                gis.gis_score
-                if gis.gis_score is not None
-                else 60.0
+        renewable_score = self._renewable_score(
+            solar_cf,
+            wind_cf,
+        )
+
+        (
+            geographic_score,
+            infrastructure_score,
+        ) = self._get_gis_scores(gis)
+
+        environmental_score = (
+            self._environmental_score(
+                weather
             )
-
-            infrastructure_score = (
-                gis.infrastructure_score
-                if gis.infrastructure_score is not None
-                else 60.0
-            )
-
-        else:
-
-            geographic_score = 60.0
-            infrastructure_score = 60.0
-
-        environmental_score = self._environmental_score(
-            weather,
         )
 
         economic_score = self._economic_score(
@@ -245,15 +355,11 @@ class ResourceAssessmentService:
         )
 
         overall_score = self._overall_score(
-            renewable_score,
-            geographic_score,
-            infrastructure_score,
-            environmental_score,
-            economic_score,
-        )
-
-        recommendation = self._recommendation(
-            overall_score,
+            renewable=renewable_score,
+            geographic=geographic_score,
+            infrastructure=infrastructure_score,
+            environmental=environmental_score,
+            economic=economic_score,
         )
 
         confidence = self._confidence_score(
@@ -264,17 +370,14 @@ class ResourceAssessmentService:
 
         resource_metrics = ResourceAssessment(
             solar_score=round(
-                solar_assessment.metrics.capacity_factor * 100,
+                solar_cf * 100,
                 2,
             ),
             wind_score=round(
-                wind_assessment.metrics.capacity_factor * 100,
+                wind_cf * 100,
                 2,
             ),
-            renewable_resource_score=round(
-                renewable_score,
-                2,
-            ),
+            renewable_resource_score=renewable_score,
             geographic_score=round(
                 geographic_score,
                 2,
@@ -283,29 +386,20 @@ class ResourceAssessmentService:
                 infrastructure_score,
                 2,
             ),
-            environmental_score=round(
-                environmental_score,
-                2,
-            ),
-            economic_score=round(
-                economic_score,
-                2,
-            ),
+            environmental_score=environmental_score,
+            economic_score=economic_score,
             overall_score=overall_score,
             solar_potential=self._classify_score(
-                solar_assessment.metrics.capacity_factor * 100,
+                solar_cf * 100
             ),
             wind_potential=self._classify_score(
-                wind_assessment.metrics.capacity_factor * 100,
+                wind_cf * 100
             ),
             recommended_energy_source=self._energy_source(
-                solar_assessment.metrics.capacity_factor,
-                wind_assessment.metrics.capacity_factor,
+                solar_cf,
+                wind_cf,
             ),
-            confidence_score=round(
-                confidence,
-                2,
-            ),                      
+            confidence_score=confidence,
         )
 
         return ResourceAssessmentReport(
@@ -317,5 +411,7 @@ class ResourceAssessmentService:
             wind_assessment=wind_assessment,
             gis_summary=gis,
             resource_metrics=resource_metrics,
-            recommendation=recommendation,
+            recommendation=self._recommendation(
+                overall_score
+            ),
         )

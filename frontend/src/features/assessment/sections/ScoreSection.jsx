@@ -1,5 +1,4 @@
 import {
-  ResourceRadarChart,
   ScoreBreakdownChart,
   SolarVsWindChart,
 } from "../charts";
@@ -33,10 +32,6 @@ export default function ScoreSection({
           metrics={metrics}
         />
       </div>
-
-      <ResourceRadarChart
-        metrics={metrics}
-      />
     </section>
   );
 }

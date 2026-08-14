@@ -34,6 +34,10 @@ class Settings(BaseSettings):
     SENTINEL_CLIENT_ID: str | None = None
     SENTINEL_CLIENT_SECRET: str | None = None
 
+    ML_PREDICTION_ENABLED: bool = False
+    SOLAR_ML_MODEL_VERSION: str = "v0.1-physics-informed"
+    WIND_ML_MODEL_VERSION: str = "v0.1-physics-informed"
+
     model_config = SettingsConfigDict(
         env_file=BASE_DIR / ".env",
         case_sensitive=True,

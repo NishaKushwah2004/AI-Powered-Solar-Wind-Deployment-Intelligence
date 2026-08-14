@@ -1,60 +1,80 @@
-from app.environmental.models.weather_result import WeatherResult
-from app.prediction.models.wind_prediction import WindPrediction
-from app.services.wind_service import WindService
+from __future__ import annotations
+
+from typing import Any
+
+from ml_core.preprocessing.feature_preparation import prepare_prediction_record
+from app.ml.inference.model_loader import MLModelLoader
+from app.schemas.ml_prediction import (
+    WindPredictionRequest,
+    PredictionResponse,
+)
 
 
 class WindPredictor:
     """
-    Wind prediction adapter.
+    Wind ML inference adapter.
 
-    This class delegates all wind prediction logic to
-    WindService, ensuring there is a single source of
-    truth for wind calculations.
+    Responsibilities:
+        - accept the authoritative wind prediction request
+        - construct the ML feature record
+        - delegate inference to the ML model loader
+        - return the model prediction
 
-    In future, this adapter can be replaced with an
-    ML model (Random Forest, XGBoost, TensorFlow, etc.)
-    without changing the PredictionService API.
+    This class MUST NOT:
+        - call WindService
+        - execute a turbine power curve
+        - calculate heuristic capacity factors
+        - calculate annual energy using formulas
+        - provide an ML fallback
     """
+
+    domain = "wind"
 
     def __init__(
         self,
-        wind_service: WindService,
-    ):
-        self.wind_service = wind_service
+        model_loader: MLModelLoader,
+    ) -> None:
+        self.model_loader = model_loader
 
     def predict(
         self,
-        weather: WeatherResult,
-    ) -> WindPrediction:
+        data: WindPredictionRequest,
+    ) -> PredictionResponse:
         """
-        Generate a wind prediction using WindService.
+        Execute wind ML inference.
         """
 
-        assessment = (
-            self.wind_service.generate_wind_assessment(
-                weather,
-            )
+        record: dict[str, Any] = {
+            "latitude": data.latitude,
+            "longitude": data.longitude,
+            "wind_speed_m_s": data.wind_speed_m_s,
+            "air_density_kg_m3": data.air_density_kg_m3,
+            "temperature_c": data.temperature_c,
+            "humidity_pct": data.humidity_pct,
+            "pressure_hpa": data.pressure_hpa,
+            "elevation_m": data.elevation_m,
+        }
+
+        # Uses the authoritative feature contract and guarantees
+        # the correct feature ordering.
+        prepare_prediction_record(
+            record,
+            self.domain,
         )
 
-        confidence = 0.94
-
-        if weather.wind_speed is None:
-            confidence -= 0.15
-
-        if weather.pressure is None:
-            confidence -= 0.05
-
-        if weather.humidity is None:
-            confidence -= 0.05
-
-        confidence = max(
-            round(confidence, 2),
-            0.70,
+        result = self.model_loader.predict(
+            record,
+            self.domain,
         )
 
-        return WindPrediction(
-            predicted_capacity_factor=assessment.metrics.capacity_factor,
-            predicted_energy_output=assessment.metrics.expected_annual_energy,
-            wind_power_density=assessment.metrics.wind_power_density,
-            confidence=confidence,
+        return PredictionResponse(
+            domain=self.domain,
+            prediction_mw=float(result["prediction"]),
+            model_version=str(result["model_version"]),
+            data_source=str(
+                result.get(
+                    "data_source",
+                    "synthetic_reference",
+                )
+            ),
         )

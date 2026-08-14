@@ -1,80 +1,84 @@
 from fastapi import APIRouter, Depends
 
-from app.api.deps import get_renewable_intelligence_service
-from app.auth.permissions import require_roles
-from app.services.renewable_intelligence_service import (
-    RenewableIntelligenceService,
+from app.api.deps import get_prediction_service
+
+from app.prediction.services.prediction_service import (
+    PredictionService,
 )
+
+from app.schemas.ml_prediction import (
+    SolarPredictionRequest,
+    WindPredictionRequest,
+    PredictionResponse,
+)
+
+from app.schemas.unified_prediction import (
+    RenewablePredictionRequest,
+    RenewablePredictionResponse,
+)
+
 
 router = APIRouter(
-    prefix="/predictions",
-    tags=["Predictions"],
+    prefix="/prediction",
+    tags=["Prediction"],
 )
 
 
-@router.get(
-    "/sites/{site_id}",
-    summary="Predict renewable energy potential for a site",
+# ---------------------------------------------------------------------
+# Solar Prediction
+# ---------------------------------------------------------------------
+
+@router.post(
+    "/solar",
+    response_model=PredictionResponse,
 )
-def predict_site(
-    site_id: int,
-    service: RenewableIntelligenceService = Depends(
-        get_renewable_intelligence_service,
+def predict_solar(
+    data: SolarPredictionRequest,
+    prediction_service: PredictionService = Depends(
+        get_prediction_service,
     ),
-    current_user=Depends(
-        require_roles(
-            "Admin",
-            "GIS Analyst",
-            "Project Manager",
-            "Renewable Energy Planner",
-        )
-    ),
-):
-    """
-    Generate a complete renewable intelligence report
-    for a single site.
-    """
+) -> PredictionResponse:
 
-    return service.analyze_site(site_id)
+    return prediction_service.predict_solar(
+        data,
+    )
 
 
-@router.get(
-    "/projects/{project_id}",
-    summary="Predict renewable energy potential for all sites in a project",
+# ---------------------------------------------------------------------
+# Wind Prediction
+# ---------------------------------------------------------------------
+
+@router.post(
+    "/wind",
+    response_model=PredictionResponse,
 )
-def predict_project(
-    project_id: int,
-    service: RenewableIntelligenceService = Depends(
-        get_renewable_intelligence_service,
+def predict_wind(
+    data: WindPredictionRequest,
+    prediction_service: PredictionService = Depends(
+        get_prediction_service,
     ),
-    current_user=Depends(
-        require_roles(
-            "Admin",
-            "GIS Analyst",
-            "Project Manager",
-            "Renewable Energy Planner",
-        )
-    ),
-):
-    """
-    Generate renewable intelligence reports
-    for every site in a project.
-    """
+) -> PredictionResponse:
 
-    return service.analyze_project(project_id)
+    return prediction_service.predict_wind(
+        data,
+    )
 
 
-@router.get(
-    "/health",
-    summary="Prediction engine health check",
+# ---------------------------------------------------------------------
+# Unified Renewable Prediction
+# ---------------------------------------------------------------------
+
+@router.post(
+    "/renewable",
+    response_model=RenewablePredictionResponse,
 )
-def prediction_health():
-    """
-    Verify that the prediction engine
-    is available.
-    """
+def predict_renewable(
+    data: RenewablePredictionRequest,
+    prediction_service: PredictionService = Depends(
+        get_prediction_service,
+    ),
+) -> RenewablePredictionResponse:
 
-    return {
-        "status": "healthy",
-        "service": "Prediction Engine",
-    }
+    return prediction_service.predict_renewable(
+        data,
+    )

@@ -107,6 +107,38 @@ class Site(Base, TimestampMixin):
         nullable=True,
     )
 
+    # ----------------------------
+    # Additional GIS Enrichment
+    # ----------------------------
+
+    water_body_distance: Mapped[
+        float | None
+    ] = mapped_column(
+        Float,
+        nullable=True,
+    )
+
+    protected_area_distance: Mapped[
+        float | None
+    ] = mapped_column(
+        Float,
+        nullable=True,
+    )
+
+    land_slope: Mapped[
+        float | None
+    ] = mapped_column(
+        Float,
+        nullable=True,
+    )
+
+    vegetation_index: Mapped[
+        float | None
+    ] = mapped_column(
+        Float,
+        nullable=True,
+    )
+
     project_id: Mapped[int] = mapped_column(
         ForeignKey(
             "projects.id",

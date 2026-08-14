@@ -7,7 +7,7 @@ import {
   PredictionOverview,
 } from "../components";
 
-import { useSitePrediction } from "../hooks";
+import { useSitePrediction } from "../hooks/useSitePrediction";
 
 export default function PredictionPage() {
   const { siteId } = useParams();

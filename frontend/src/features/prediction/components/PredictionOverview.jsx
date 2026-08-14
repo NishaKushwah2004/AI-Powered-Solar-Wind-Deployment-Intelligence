@@ -21,7 +21,15 @@ import {
 export default function PredictionOverview({
   prediction,
 }) {
-  if (!prediction) return null;
+  if (!prediction) {
+    return (
+      <div className="rounded-lg border p-6">
+        <p className="text-sm text-gray-500">
+          Prediction data is not available.
+        </p>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-8">

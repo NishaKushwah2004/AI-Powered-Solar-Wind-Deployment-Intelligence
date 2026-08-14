@@ -59,59 +59,76 @@ class SiteService(BaseService[SiteRepository]):
                 detail="Project not found",
             )
 
-        gis_data = (
-            self.gis_enrichment_service.enrich_site(
-                site_data.latitude,
-                site_data.longitude,
-            )
-        )
+        # -----------------------------------------
+        # Create site first
+        # -----------------------------------------
 
         site = Site(
             name=site_data.name,
             description=site_data.description,
-
             latitude=site_data.latitude,
             longitude=site_data.longitude,
-
             region=site_data.region,
             land_area=site_data.land_area,
-
-            elevation=gis_data.elevation,
-
-            land_use=gis_data.land_use,
-
-            existing_infrastructure=(
-                gis_data.existing_infrastructure
-            ),
-
-            road_distance=(
-                gis_data.road_distance
-            ),
-
-            nearest_substation_distance=(
-                gis_data.nearest_substation_distance
-            ),
-
-            nearest_transmission_line_distance=(
-                gis_data.nearest_transmission_line_distance
-            ),
-
-            water_body_distance=(
-                gis_data.water_body_distance
-            ),
-
-            protected_area_distance=(
-                gis_data.protected_area_distance
-            ),
-
-            land_slope=gis_data.land_slope,
-
-            vegetation_index=gis_data.vegetation_index,
-
+            existing_infrastructure=site_data.existing_infrastructure,
             project_id=site_data.project_id,
         )
 
-        return self.repository.create(site)
+        site = self.repository.create(site)
+
+        # -----------------------------------------
+        # Try GIS enrichment
+        # -----------------------------------------
+
+        try:
+            gis_data = (
+                self.gis_enrichment_service.enrich_site(
+                    site.latitude,
+                    site.longitude,
+                )
+            )
+
+            site.elevation = gis_data.elevation
+            site.land_use = gis_data.land_use
+
+            site.existing_infrastructure = (
+                gis_data.existing_infrastructure
+            )
+
+            site.road_distance = (
+                gis_data.road_distance
+            )
+
+            site.nearest_substation_distance = (
+                gis_data.nearest_substation_distance
+            )
+
+            site.nearest_transmission_line_distance = (
+                gis_data.nearest_transmission_line_distance
+            )
+
+            site.water_body_distance = (
+                gis_data.water_body_distance
+            )
+
+            site.protected_area_distance = (
+                gis_data.protected_area_distance
+            )
+
+            site.land_slope = gis_data.land_slope
+
+            site.vegetation_index = (
+                gis_data.vegetation_index
+            )
+
+            site = self.repository.update(site)
+
+        except Exception as exc:
+            print(
+                f"GIS enrichment failed: {exc}"
+            )
+
+        return site
 
     def update_site(
         self,

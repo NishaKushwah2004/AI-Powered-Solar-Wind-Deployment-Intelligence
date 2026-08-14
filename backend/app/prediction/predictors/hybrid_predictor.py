@@ -1,81 +1,75 @@
-from app.prediction.models.hybrid_prediction import HybridPrediction
-from app.prediction.models.solar_prediction import SolarPrediction
-from app.prediction.models.wind_prediction import WindPrediction
+from __future__ import annotations
+
+from app.schemas.ml_prediction import PredictionResponse
+from app.schemas.unified_prediction import (
+    RenewablePredictionResponse,
+)
 
 
 class HybridPredictor:
     """
-    Hybrid renewable energy predictor.
+    Combines independent solar and wind ML predictions.
+
+    Responsibilities:
+        - combine solar ML output
+        - combine wind ML output
+        - calculate total renewable generation
+
+    Does NOT:
+        - load ML models
+        - perform solar prediction
+        - perform wind prediction
+        - execute heuristic logic
+        - call SolarService
+        - call WindService
     """
 
     def predict(
         self,
-        solar: SolarPrediction,
-        wind: WindPrediction,
-    ) -> HybridPrediction:
+        solar_prediction: PredictionResponse,
+        wind_prediction: PredictionResponse,
+        latitude: float,
+        longitude: float,
+    ) -> RenewablePredictionResponse:
+        """
+        Combine solar and wind ML predictions.
+        """
 
-        total_energy = (
-            solar.predicted_energy_output
-            + wind.predicted_energy_output
+        if solar_prediction.domain != "solar":
+            raise ValueError(
+                "HybridPredictor expected a solar prediction."
+            )
+
+        if wind_prediction.domain != "wind":
+            raise ValueError(
+                "HybridPredictor expected a wind prediction."
+            )
+
+        solar_generation_mw = float(
+            solar_prediction.prediction_mw
         )
 
-        if total_energy == 0:
-
-            solar_share = 0
-
-            wind_share = 0
-
-        else:
-
-            solar_share = (
-                solar.predicted_energy_output
-                / total_energy
-            ) * 100
-
-            wind_share = (
-                wind.predicted_energy_output
-                / total_energy
-            ) * 100
-
-        if (
-            40 <= solar_share <= 60
-        ):
-            recommendation = (
-                "Balanced Hybrid Configuration"
-            )
-
-        elif solar_share > wind_share:
-            recommendation = (
-                "Solar Dominant Hybrid"
-            )
-
-        else:
-            recommendation = (
-                "Wind Dominant Hybrid"
-            )
-
-        confidence = round(
-            (
-                solar.confidence
-                + wind.confidence
-            )
-            / 2,
-            2,
+        wind_generation_mw = float(
+            wind_prediction.prediction_mw
         )
 
-        return HybridPrediction(
-            solar_contribution=round(
-                solar_share,
-                2,
+        total_generation_mw = (
+            solar_generation_mw
+            + wind_generation_mw
+        )
+
+        return RenewablePredictionResponse(
+            latitude=latitude,
+            longitude=longitude,
+            solar_generation_mw=solar_generation_mw,
+            wind_generation_mw=wind_generation_mw,
+            total_generation_mw=total_generation_mw,
+            model_version=(
+                f"solar:{solar_prediction.model_version};"
+                f"wind:{wind_prediction.model_version}"
             ),
-            wind_contribution=round(
-                wind_share,
-                2,
+            data_source=(
+                f"solar:{solar_prediction.data_source};"
+                f"wind:{wind_prediction.data_source}"
             ),
-            total_expected_energy=round(
-                total_energy,
-                2,
-            ),
-            recommended_configuration=recommendation,
-            confidence=confidence,
         )

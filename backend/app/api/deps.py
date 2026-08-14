@@ -16,20 +16,7 @@ from app.environmental.clients.weather_client import (
 from app.environmental.services.resource_assessment_service import (
     ResourceAssessmentService,
 )
-
-from app.prediction.predictors.hybrid_predictor import (
-    HybridPredictor,
-)
-from app.prediction.predictors.solar_predictor import (
-    SolarPredictor,
-)
-from app.prediction.predictors.wind_predictor import (
-    WindPredictor,
-)
-from app.prediction.services.prediction_service import (
-    PredictionService,
-)
-
+from app.core.config import settings
 from app.services.environmental_service import (
     EnvironmentalService,
 )
@@ -49,6 +36,22 @@ from app.services.wind_service import (
     WindService,
 )
 
+from functools import lru_cache
+
+from app.prediction.predictors.solar_predictor import (
+    SolarPredictor,
+)
+
+from app.prediction.predictors.wind_predictor import (
+    WindPredictor,
+)
+
+from app.prediction.services.prediction_service import (
+    PredictionService,
+)
+from app.ml.inference.model_loader import MLModelLoader
+
+from app.core.config import settings
 
 # ---------------------------------------------------------
 # Database
@@ -164,35 +167,63 @@ def get_environmental_service(
 
 
 # ---------------------------------------------------------
-# Prediction Service
+# Prediction / ML
 # ---------------------------------------------------------
 
-def get_prediction_service(
-    solar_service: SolarService = Depends(
-        get_solar_service,
-    ),
-    wind_service: WindService = Depends(
-        get_wind_service,
-    ),
-) -> PredictionService:
+@lru_cache
+def get_solar_model() -> MLModelLoader:
+    """
+    Load the solar ML model once.
+
+    No heuristic fallback exists.
+    """
+
+    return MLModelLoader(
+        domain="solar",
+        version=settings.SOLAR_ML_MODEL_VERSION,
+    )
+
+
+@lru_cache
+def get_wind_model() -> MLModelLoader:
+    """
+    Load the wind ML model once.
+
+    No heuristic fallback exists.
+    """
+
+    return MLModelLoader(
+        domain="wind",
+        version=settings.WIND_ML_MODEL_VERSION,
+    )
+
+
+@lru_cache
+def get_prediction_service() -> PredictionService:
+    """
+    Construct the single prediction orchestration service.
+
+    API
+      ↓
+    PredictionService
+      ↓
+    SolarPredictor / WindPredictor
+      ↓
+    ML model
+    """
 
     solar_predictor = SolarPredictor(
-        solar_service,
+        model_loader=get_solar_model(),
     )
 
     wind_predictor = WindPredictor(
-        wind_service,
+        model_loader=get_wind_model(),
     )
-
-    hybrid_predictor = HybridPredictor()
 
     return PredictionService(
         solar_predictor=solar_predictor,
         wind_predictor=wind_predictor,
-        hybrid_predictor=hybrid_predictor,
     )
-
-
 # ---------------------------------------------------------
 # Renewable Intelligence Service
 # ---------------------------------------------------------

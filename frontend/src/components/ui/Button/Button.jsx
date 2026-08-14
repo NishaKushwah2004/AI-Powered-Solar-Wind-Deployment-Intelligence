@@ -1,7 +1,5 @@
 import { LoaderCircle } from "lucide-react";
-
 import { buttonVariants } from "./buttonVariants";
-
 import { cn } from "@/utils/cn";
 
 export default function Button({
@@ -12,6 +10,9 @@ export default function Button({
   loading = false,
   icon,
   className,
+
+  fullWidth = false,   // <-- add this
+
   ...props
 }) {
   return (
@@ -22,6 +23,7 @@ export default function Button({
           variant,
           size,
         }),
+        fullWidth && "w-full",    // <-- apply styling here
         className
       )}
       disabled={loading || props.disabled}

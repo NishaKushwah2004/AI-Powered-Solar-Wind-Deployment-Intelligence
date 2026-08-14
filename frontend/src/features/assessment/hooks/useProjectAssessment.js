@@ -8,11 +8,7 @@ export function useProjectAssessment(
   projectId
 ) {
   return useQuery({
-    queryKey: [
-      ...QUERY_KEYS.ASSESSMENT,
-      "project",
-      projectId,
-    ],
+    queryKey: QUERY_KEYS.PROJECT_ASSESSMENT(projectId),
 
     queryFn: () =>
       assessmentService.getProjectReport(

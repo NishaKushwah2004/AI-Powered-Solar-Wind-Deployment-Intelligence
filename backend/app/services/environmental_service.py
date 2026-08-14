@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from fastapi import HTTPException
 
 from app.environmental.clients.nasa_power_client import (
@@ -9,19 +11,34 @@ from app.environmental.clients.weather_client import (
 from app.environmental.services.resource_assessment_service import (
     ResourceAssessmentService,
 )
-from app.repositories.project_repository import ProjectRepository
-from app.repositories.site_repository import SiteRepository
+from app.gis.models import GISResult
+from app.repositories.project_repository import (
+    ProjectRepository,
+)
+from app.repositories.site_repository import (
+    SiteRepository,
+)
 from app.services.gis_enrichment_service import (
     GISEnrichmentService,
 )
 
+
 class EnvironmentalService:
     """
-    Environmental Intelligence Engine.
+    Environmental Intelligence Orchestrator.
 
-    Coordinates environmental data collection,
-    GIS enrichment and renewable resource
-    assessment.
+    Responsible for:
+
+        Weather data
+            ↓
+        NASA solar resource
+            ↓
+        GIS enrichment
+            ↓
+        Resource Assessment
+
+    This service coordinates providers and services.
+    It does not implement prediction algorithms itself.
     """
 
     def __init__(
@@ -48,7 +65,108 @@ class EnvironmentalService:
             gis_enrichment_service
         )
 
-    def get_environmental_data(
+    # =========================================================
+    # GIS
+    # =========================================================
+
+    def _build_gis_result(
+        self,
+        site,
+    ) -> GISResult:
+        """
+        Build GIS information from stored site data.
+
+        If enrichment data is unavailable, live GIS enrichment
+        is attempted.
+        """
+
+        gis_fields = (
+            "land_use",
+            "elevation",
+            "road_distance",
+            "nearest_substation_distance",
+            "nearest_transmission_line_distance",
+            "existing_infrastructure",
+            "water_body_distance",
+            "protected_area_distance",
+            "land_slope",
+            "vegetation_index",
+        )
+
+        has_stored_gis = any(
+            getattr(site, field, None) is not None
+            for field in gis_fields
+        )
+
+        if has_stored_gis:
+
+            return GISResult(
+                land_use=site.land_use,
+                elevation=site.elevation,
+                road_distance=site.road_distance,
+                nearest_substation_distance=(
+                    site.nearest_substation_distance
+                ),
+                nearest_transmission_line_distance=(
+                    site.nearest_transmission_line_distance
+                ),
+                existing_infrastructure=(
+                    site.existing_infrastructure
+                ),
+                water_body_distance=(
+                    site.water_body_distance
+                ),
+                protected_area_distance=(
+                    site.protected_area_distance
+                ),
+                land_slope=site.land_slope,
+                vegetation_index=site.vegetation_index,
+                terrain_classification=None,
+                infrastructure_score=0,
+                gis_score=0,
+                site_suitability="Unknown",
+            )
+
+        return self._enrich_gis(
+            site.latitude,
+            site.longitude,
+        )
+
+    def _enrich_gis(
+        self,
+        latitude: float,
+        longitude: float,
+    ) -> GISResult:
+
+        try:
+            return self.gis_enrichment_service.enrich_site(
+                latitude,
+                longitude,
+            )
+
+        except Exception:
+            return GISResult(
+                land_use=None,
+                elevation=0,
+                road_distance=None,
+                nearest_substation_distance=None,
+                nearest_transmission_line_distance=None,
+                existing_infrastructure=None,
+                water_body_distance=None,
+                protected_area_distance=None,
+                land_slope=0,
+                vegetation_index=None,
+                terrain_classification="Unknown",
+                infrastructure_score=0,
+                gis_score=0,
+                site_suitability="Unknown",
+            )
+
+    # =========================================================
+    # PROVIDER DATA
+    # =========================================================
+
+    def _get_environmental_inputs(
         self,
         latitude: float,
         longitude: float,
@@ -64,22 +182,43 @@ class EnvironmentalService:
             longitude,
         )
 
-        gis = self.gis_enrichment_service.enrich_site(
+        gis = self._enrich_gis(
             latitude,
             longitude,
         )
 
+        return weather, solar, gis
+
+    # =========================================================
+    # AD-HOC LOCATION
+    # =========================================================
+
+    def get_environmental_data(
+        self,
+        latitude: float,
+        longitude: float,
+    ):
+
+        weather, solar, gis = (
+            self._get_environmental_inputs(
+                latitude,
+                longitude,
+            )
+        )
+
+        site = type(
+            "Site",
+            (),
+            {
+                "name": "Ad-hoc Location",
+                "latitude": latitude,
+                "longitude": longitude,
+            },
+        )()
+
         assessment = (
             self.resource_assessment_service.generate_report(
-                site=type(
-                    "Site",
-                    (),
-                    {
-                        "name": "Ad-hoc Location",
-                        "latitude": latitude,
-                        "longitude": longitude,
-                    },
-                )(),
+                site=site,
                 weather=weather,
                 solar=solar,
                 gis=gis,
@@ -92,6 +231,10 @@ class EnvironmentalService:
             "gis": gis,
             "assessment": assessment,
         }
+
+    # =========================================================
+    # SITE
+    # =========================================================
 
     def get_site_environment(
         self,
@@ -118,10 +261,7 @@ class EnvironmentalService:
             site.longitude,
         )
 
-        gis = self.gis_enrichment_service.enrich_site(
-            site.latitude,
-            site.longitude,
-        )
+        gis = self._build_gis_result(site)
 
         report = (
             self.resource_assessment_service.generate_report(
@@ -139,6 +279,10 @@ class EnvironmentalService:
             "gis": gis,
             "assessment": report,
         }
+
+    # =========================================================
+    # PROJECT
+    # =========================================================
 
     def get_project_environment(
         self,
@@ -173,12 +317,7 @@ class EnvironmentalService:
                 site.longitude,
             )
 
-            gis = (
-                self.gis_enrichment_service.enrich_site(
-                    site.latitude,
-                    site.longitude,
-                )
-            )
+            gis = self._build_gis_result(site)
 
             report = (
                 self.resource_assessment_service.generate_report(
