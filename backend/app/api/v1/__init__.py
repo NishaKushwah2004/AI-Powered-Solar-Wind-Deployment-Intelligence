@@ -9,6 +9,29 @@ from app.api.v1.dashboard import router as dashboard_router
 from app.api.v1.environment import router as environment_router
 from app.api.v1.prediction import router as prediction_router
 from app.api.v1.assessment import router as assessment_router
+from app.api.v1.suitability import router as suitability_router
+from app.api.v1.site_scoring import router as site_scoring_router
+from app.api.v1.renewable_recommendation import router as renewable_recommendation_router
+from app.api.v1.deployment_optimization import (
+    router as deployment_optimization_router,
+)
+from app.api.v1.energy_forecasting import (
+    router as energy_forecasting_router,
+)
+from app.api.v1.investment_recommendation import (
+    router as investment_recommendation_router,
+)
+from app.api.v1.planner_dashboard import (
+    router as planner_dashboard_router,
+)
+from app.api.v1.gis_analyst_dashboard import (
+    router as gis_analyst_dashboard_router,
+)
+from app.api.v1.project_manager_dashboard import (
+    router as project_manager_dashboard_router,
+)
+
+
 
 api_router = APIRouter()
 
@@ -21,3 +44,26 @@ api_router.include_router(dashboard_router)
 api_router.include_router(environment_router)
 api_router.include_router(prediction_router)
 api_router.include_router(assessment_router)
+api_router.include_router(suitability_router)
+api_router.include_router(site_scoring_router)
+api_router.include_router(
+    renewable_recommendation_router
+)
+api_router.include_router(
+    deployment_optimization_router
+)
+api_router.include_router(
+    energy_forecasting_router
+)
+api_router.include_router(
+    investment_recommendation_router
+)
+api_router.include_router(
+    planner_dashboard_router
+)
+api_router.include_router(
+    gis_analyst_dashboard_router
+)
+api_router.include_router(
+    project_manager_dashboard_router
+)

@@ -7,7 +7,7 @@ import toast from "react-hot-toast";
 
 import { QUERY_KEYS } from "@/constants/queryKeys";
 
-import { useAuth } from "@/features/auth/context/AuthContext";
+import { useAuth } from "@/features/auth/context/useAuth";
 
 import { profileService } from "../services/profileService";
 

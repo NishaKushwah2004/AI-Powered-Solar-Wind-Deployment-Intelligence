@@ -1,42 +1,41 @@
 import {
   createContext,
-  useContext,
   useMemo,
   useState,
+  useCallback,
 } from "react";
 
 import { STORAGE_KEYS } from "@/constants/storageKeys";
 import { DEFAULT_USER } from "@/types/user";
 
-const AuthContext = createContext(null);
+export const AuthContext = createContext(null);
+
+const getStoredToken = () =>
+  localStorage.getItem(STORAGE_KEYS.ACCESS_TOKEN);
+
+const storeToken = (token) =>
+  localStorage.setItem(STORAGE_KEYS.ACCESS_TOKEN, token);
+
+const removeStoredToken = () =>
+  localStorage.removeItem(STORAGE_KEYS.ACCESS_TOKEN);
 
 export function AuthProvider({ children }) {
-  const [token, setToken] = useState(
-    localStorage.getItem(STORAGE_KEYS.ACCESS_TOKEN)
-  );
+  const [token, setToken] = useState(getStoredToken);
 
   const [user, setUser] = useState(DEFAULT_USER);
 
   const [loading, setLoading] = useState(false);
 
-  const login = (accessToken) => {
-    localStorage.setItem(
-      STORAGE_KEYS.ACCESS_TOKEN,
-      accessToken
-    );
-
+  const login = useCallback((accessToken) => {
+    storeToken(accessToken);
     setToken(accessToken);
-  };
+  }, []);
 
-  const logout = () => {
-    localStorage.removeItem(
-      STORAGE_KEYS.ACCESS_TOKEN
-    );
-
+  const logout = useCallback(() => {
+    removeStoredToken();
     setToken(null);
-
     setUser(DEFAULT_USER);
-  };
+  }, []);
 
   const value = useMemo(
     () => ({
@@ -44,16 +43,15 @@ export function AuthProvider({ children }) {
       user,
       loading,
 
-      isAuthenticated: !!token,
+      isAuthenticated: Boolean(token),
 
       login,
       logout,
 
       setUser,
       setLoading,
-      setToken,
     }),
-    [token, user, loading]
+    [token, user, loading, login, logout]
   );
 
   return (
@@ -63,14 +61,3 @@ export function AuthProvider({ children }) {
   );
 }
 
-export function useAuth() {
-  const context = useContext(AuthContext);
-
-  if (!context) {
-    throw new Error(
-      "useAuth must be used within AuthProvider."
-    );
-  }
-
-  return context;
-}

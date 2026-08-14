@@ -34,11 +34,23 @@ export default function ProjectsPage() {
     useDeleteProject();
 
   const filteredProjects = useMemo(() => {
-    return projects.filter((project) =>
-      project.name
-        .toLowerCase()
-        .includes(search.toLowerCase())
-    );
+    const query = search.trim().toLowerCase();
+
+    if (!query) return projects;
+
+    return projects.filter((project) => {
+      return (
+        project.name
+          ?.toLowerCase()
+          .includes(query) ||
+        project.region
+          ?.toLowerCase()
+          .includes(query) ||
+        project.description
+          ?.toLowerCase()
+          .includes(query)
+      );
+    });
   }, [projects, search]);
 
   const handleCreate = () => {
@@ -46,7 +58,9 @@ export default function ProjectsPage() {
   };
 
   const handleEdit = (project) => {
-    navigate(ROUTES.projectEdit(project.id));
+    navigate(
+      ROUTES.projectEdit(project.id)
+    );
   };
 
   const handleDelete = (project) => {
@@ -54,9 +68,13 @@ export default function ProjectsPage() {
   };
 
   const confirmDelete = () => {
-    deleteMutation.mutate(selectedProject.id);
+    if (!selectedProject) return;
 
-    setSelectedProject(null);
+    deleteMutation.mutate(selectedProject.id, {
+      onSuccess: () => {
+        setSelectedProject(null);
+      },
+    });
   };
 
   return (

@@ -7,6 +7,7 @@ export default function Dialog({
   onConfirm,
   title,
   description,
+  loading = false,
 }) {
   return (
     <Modal
@@ -23,12 +24,14 @@ export default function Dialog({
         <Button
           variant="outline"
           onClick={onClose}
+          disabled={loading}
         >
           Cancel
         </Button>
 
         <Button
           variant="danger"
+          loading={loading}
           onClick={onConfirm}
         >
           Confirm

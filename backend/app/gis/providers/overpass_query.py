@@ -1,71 +1,32 @@
 """
 Reusable Overpass API queries.
 
-The placeholders:
+Placeholders:
 {lat}
 {lon}
 {radius}
-
-are replaced dynamically.
 """
 
-ROAD_QUERY = """
-[out:json];
-(
-  way(around:{radius},{lat},{lon})["highway"];
-);
-out center;
-"""
+SITE_FEATURES_QUERY = """
+[out:json][timeout:30];
 
-LAND_USE_QUERY = """
-[out:json];
 (
-  way(around:{radius},{lat},{lon})["landuse"];
-);
-out center;
-"""
+    way(around:{radius},{lat},{lon})["highway"];
+    way(around:{radius},{lat},{lon})["landuse"];
 
-POWER_LINE_QUERY = """
-[out:json];
-(
-  way(around:{radius},{lat},{lon})["power"="line"];
-);
-out center;
-"""
+    node(around:{radius},{lat},{lon})["power"="substation"];
+    way(around:{radius},{lat},{lon})["power"="substation"];
 
-SUBSTATION_QUERY = """
-[out:json];
-(
-  node(around:{radius},{lat},{lon})["power"="substation"];
-  way(around:{radius},{lat},{lon})["power"="substation"];
-);
-out center;
-"""
+    way(around:{radius},{lat},{lon})["power"="line"];
 
-WATER_QUERY = """
-[out:json];
-(
-  way(around:{radius},{lat},{lon})["natural"="water"];
-  way(around:{radius},{lat},{lon})["waterway"];
-);
-out center;
-"""
+    way(around:{radius},{lat},{lon})["natural"="water"];
+    way(around:{radius},{lat},{lon})["waterway"];
 
-PROTECTED_AREA_QUERY = """
-[out:json];
-(
-  way(around:{radius},{lat},{lon})["boundary"="protected_area"];
-  way(around:{radius},{lat},{lon})["leisure"="nature_reserve"];
-  relation(around:{radius},{lat},{lon})["boundary"="protected_area"];
-);
-out center;
-"""
+    way(around:{radius},{lat},{lon})["boundary"="protected_area"];
+    relation(around:{radius},{lat},{lon})["boundary"="protected_area"];
 
-INFRASTRUCTURE_QUERY = """
-[out:json];
-(
-  node(around:{radius},{lat},{lon});
-  way(around:{radius},{lat},{lon});
+    way(around:{radius},{lat},{lon})["leisure"="nature_reserve"];
 );
-out center;
+
+out center tags;
 """

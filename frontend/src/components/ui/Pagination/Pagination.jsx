@@ -7,28 +7,29 @@ export default function Pagination({
   onNext,
 }) {
   return (
-    <div className="flex items-center justify-end gap-3">
-
+    <nav
+      aria-label="Pagination"
+      className="flex items-center justify-end gap-3"
+    >
       <Button
         variant="outline"
         onClick={onPrevious}
-        disabled={page === 1}
+        disabled={page <= 1}
       >
         Previous
       </Button>
 
-      <span>
-        {page} / {totalPages}
+      <span className="text-sm font-medium">
+        Page {page} of {totalPages}
       </span>
 
       <Button
         variant="outline"
         onClick={onNext}
-        disabled={page === totalPages}
+        disabled={page >= totalPages}
       >
         Next
       </Button>
-
-    </div>
+    </nav>
   );
 }

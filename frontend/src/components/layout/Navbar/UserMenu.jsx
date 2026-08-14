@@ -6,7 +6,7 @@ import { useState } from "react";
 
 import Avatar from "@/components/ui/Avatar";
 
-import { useAuth } from "@/features/auth/context/AuthContext";
+import { useAuth } from "@/features/auth/context/useAuth";
 
 import UserDropdown from "./UserDropdown";
 
@@ -19,6 +19,8 @@ export default function UserMenu() {
     <div className="relative">
 
       <button
+        type="button"
+        aria-label="Open user menu"
         onClick={() => setOpen((prev) => !prev)}
         className="flex items-center gap-3 rounded-xl p-2 hover:bg-slate-100"
       >

@@ -25,6 +25,7 @@ export default function PageError({
 
       {onRetry && (
         <Button
+          type="button"
           className="mt-6"
           onClick={onRetry}
         >

@@ -15,5 +15,12 @@ export function useProjectSites(projectId) {
       gisService.getProjectSites(projectId),
 
     enabled: !!projectId,
+
+    staleTime: 1000 * 60 * 5,
+    gcTime: 1000 * 60 * 10,
+
+    retry: 1,
+
+    refetchOnWindowFocus: false,
   });
 }

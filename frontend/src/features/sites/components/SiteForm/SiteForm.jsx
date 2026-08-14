@@ -49,6 +49,7 @@ export default function SiteForm({
 
   return (
     <form
+      noValidate
       onSubmit={handleSubmit(onSubmit)}
       className="space-y-8"
     >
@@ -58,64 +59,64 @@ export default function SiteForm({
       >
         <Input
           label="Site Name"
-          {...register("name")}
+          placeholder="Enter site name"
+          autoComplete="off"
+          disabled={loading}
           error={errors.name?.message}
+          {...register("name")}
         />
 
         <Textarea
           label="Description"
+          placeholder="Enter site description"
+          disabled={loading}
+          error={errors.description?.message}
           {...register("description")}
-          error={
-            errors.description?.message
-          }
         />
 
         <Select
           label="Project"
+          placeholder="Select Project"
           options={projectOptions}
-          {...register("project_id")}
-          error={
-            errors.project_id?.message
-          }
+          disabled={loading}
+          error={errors.project_id?.message}
+          {...register("project_id", {
+            valueAsNumber: true,
+          })}
         />
 
         <div className="grid gap-6 md:grid-cols-2">
-
           <Input
             type="number"
             step="any"
             label="Latitude"
+            placeholder="e.g. 23.1815"
+            disabled={loading}
+            error={errors.latitude?.message}
             {...register("latitude")}
-            error={
-              errors.latitude?.message
-            }
           />
 
           <Input
             type="number"
             step="any"
             label="Longitude"
+            placeholder="e.g. 79.9864"
+            disabled={loading}
+            error={errors.longitude?.message}
             {...register("longitude")}
-            error={
-              errors.longitude?.message
-            }
           />
-
         </div>
-
       </FormSection>
 
       <div className="flex justify-end">
-
         <Button
           type="submit"
           loading={loading}
+          disabled={loading}
         >
           {submitLabel}
         </Button>
-
       </div>
-
     </form>
   );
 }

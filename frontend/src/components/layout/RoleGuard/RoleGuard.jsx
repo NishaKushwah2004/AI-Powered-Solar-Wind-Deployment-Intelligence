@@ -1,17 +1,26 @@
 import { Navigate } from "react-router-dom";
 
+import LoadingScreen from "@/components/feedback/LoadingScreen";
+
 import { ROUTES } from "@/config/navigation/routes";
-import { useAuth } from "@/features/auth/context/AuthContext";
+import { useAuth } from "@/features/auth/context/useAuth";
 
 export default function RoleGuard({
-  allowedRoles,
+  allowedRoles = [],
   children,
 }) {
-  const { user } = useAuth();
+  const {
+    loading,
+    isAuthenticated,
+    user,
+  } = useAuth();
 
-  const role = user?.role?.name;
+  if (loading) {
+    return <LoadingScreen />;
+  }
 
-  if (!role) {
+  // User is not logged in
+  if (!isAuthenticated) {
     return (
       <Navigate
         to={ROUTES.LOGIN}
@@ -20,6 +29,16 @@ export default function RoleGuard({
     );
   }
 
+  const role =
+    user?.role?.name ?? user?.role;
+
+  // Logged in but role hasn't been loaded yet.
+  // Avoid redirecting to login.
+  if (!role) {
+    return <LoadingScreen />;
+  }
+
+  // Logged in but not authorized.
   if (!allowedRoles.includes(role)) {
     return (
       <Navigate

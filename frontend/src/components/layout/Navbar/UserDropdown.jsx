@@ -8,7 +8,7 @@ import { Link, useNavigate } from "react-router-dom";
 
 import { ROUTES } from "@/config/navigation/routes";
 
-import { useAuth } from "@/features/auth/context/AuthContext";
+import { useAuth } from "@/features/auth/context/useAuth";
 
 export default function UserDropdown({
   closeDropdown,
@@ -41,6 +41,7 @@ export default function UserDropdown({
       </Link>
 
       <button
+        type="button"
         disabled
         className="flex w-full items-center gap-3 px-4 py-3 text-slate-400"
       >
@@ -59,6 +60,7 @@ export default function UserDropdown({
       <hr />
 
       <button
+        type="button"
         onClick={handleLogout}
         className="flex w-full items-center gap-3 px-4 py-3 text-red-600 hover:bg-red-50"
       >

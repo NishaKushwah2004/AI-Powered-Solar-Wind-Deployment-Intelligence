@@ -3,7 +3,10 @@ import { forwardRef } from "react";
 import FormField from "@/components/ui/FormField";
 import { cn } from "@/utils/cn";
 
-import { FORM_CONTROL, FORM_CONTROL_ERROR, } from "@/constants/formStyles";
+import {
+  FORM_CONTROL,
+  FORM_CONTROL_ERROR,
+} from "@/constants/formStyles";
 
 const Textarea = forwardRef(
   (
@@ -18,6 +21,10 @@ const Textarea = forwardRef(
     },
     ref
   ) => {
+    const errorId = error
+      ? `${id}-error`
+      : undefined;
+
     return (
       <FormField
         id={id}
@@ -29,12 +36,13 @@ const Textarea = forwardRef(
         <textarea
           ref={ref}
           id={id}
+          aria-invalid={!!error}
+          aria-describedby={errorId}
           className={cn(
             FORM_CONTROL,
             error && FORM_CONTROL_ERROR,
             className
           )}
-          aria-invalid={!!error}
           {...props}
         />
       </FormField>

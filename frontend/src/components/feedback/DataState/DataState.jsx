@@ -8,11 +8,12 @@ export default function DataState({
   isEmpty = false,
   loading = null,
   empty = null,
+  onRetry,
   children,
 }) {
   if (isLoading) {
     return (
-      loading || (
+      loading ?? (
         <div className="flex justify-center py-12">
           <Spinner />
         </div>
@@ -24,9 +25,10 @@ export default function DataState({
     return (
       <PageError
         message={
-          error?.response?.data?.detail ||
+          error?.response?.data?.detail ??
           error?.message
         }
+        onRetry={onRetry}
       />
     );
   }

@@ -1,7 +1,6 @@
 import {
   Button,
   Input,
-  Select,
   Textarea,
 } from "@/components/ui";
 
@@ -11,7 +10,6 @@ import useZodForm from "@/hooks/useZodForm";
 
 import projectSchema from "../../schemas/projectSchema";
 
-import { REGIONS } from "@/constants/regions";
 
 export default function ProjectForm({
   defaultValues = {
@@ -19,11 +17,8 @@ export default function ProjectForm({
     description: "",
     region: "",
   },
-
   loading = false,
-
   submitLabel = "Save Project",
-
   onSubmit,
 }) {
   const {
@@ -36,6 +31,7 @@ export default function ProjectForm({
 
   return (
     <form
+      noValidate
       onSubmit={handleSubmit(onSubmit)}
       className="space-y-8"
     >
@@ -46,6 +42,8 @@ export default function ProjectForm({
         <Input
           label="Project Name"
           placeholder="Enter project name"
+          autoComplete="off"
+          disabled={loading}
           error={errors.name?.message}
           {...register("name")}
         />
@@ -53,16 +51,9 @@ export default function ProjectForm({
         <Textarea
           label="Description"
           placeholder="Project description"
+          disabled={loading}
           error={errors.description?.message}
           {...register("description")}
-        />
-
-        <Select
-          label="Region"
-          placeholder="Select region"
-          options={REGIONS}
-          error={errors.region?.message}
-          {...register("region")}
         />
       </FormSection>
 
@@ -70,6 +61,7 @@ export default function ProjectForm({
         <Button
           type="submit"
           loading={loading}
+          disabled={loading}
         >
           {submitLabel}
         </Button>

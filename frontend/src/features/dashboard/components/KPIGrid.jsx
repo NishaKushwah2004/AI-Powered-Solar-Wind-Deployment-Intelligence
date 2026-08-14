@@ -1,8 +1,8 @@
 import {
   FolderKanban,
   MapPinned,
-  Users,
-  Activity,
+  Leaf,
+  BarChart3,
 } from "lucide-react";
 
 import KPICard from "./KPICard";
@@ -12,31 +12,35 @@ export default function KPIGrid({
 }) {
   return (
     <div className="mb-8 grid gap-6 md:grid-cols-2 xl:grid-cols-4">
-
       <KPICard
         title="Projects"
-        value={summary.total_projects}
+        value={summary?.total_projects ?? 0}
         icon={FolderKanban}
       />
 
       <KPICard
         title="Sites"
-        value={summary.total_sites}
+        value={summary?.total_sites ?? 0}
         icon={MapPinned}
       />
 
       <KPICard
-        title="Users"
-        value={summary.total_users}
-        icon={Users}
+        title="Assessment Score"
+        value={
+          summary?.average_assessment_score ??
+          "--"
+        }
+        icon={BarChart3}
       />
 
       <KPICard
-        title="System"
-        value={summary.system_status}
-        icon={Activity}
+        title="Prediction Confidence"
+        value={
+          summary?.average_prediction_confidence ??
+          "--"
+        }
+        icon={Leaf}
       />
-
     </div>
   );
 }

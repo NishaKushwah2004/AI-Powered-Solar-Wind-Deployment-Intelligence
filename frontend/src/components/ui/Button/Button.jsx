@@ -1,71 +1,41 @@
 import { LoaderCircle } from "lucide-react";
-
 import { buttonVariants } from "./buttonVariants";
-
 import { cn } from "@/utils/cn";
 
 export default function Button({
+  type = "button",
+  children,
+  variant,
+  size,
+  loading = false,
+  icon,
+  className,
 
-    children,
+  fullWidth = false,   // <-- add this
 
-    variant,
+  ...props
+}) {
+  return (
+    <button
+      type={type}
+      className={cn(
+        buttonVariants({
+          variant,
+          size,
+        }),
+        fullWidth && "w-full",    // <-- apply styling here
+        className
+      )}
+      disabled={loading || props.disabled}
+      {...props}
+    >
+      {loading ? (
+        <LoaderCircle className="mr-2 h-4 w-4 animate-spin" />
+      ) : (
+        icon
+      )}
 
-    size,
-
-    loading,
-
-    icon,
-
-    className,
-
-    ...props
-
-}){
-
-    return(
-
-        <button
-
-            className={cn(
-
-                buttonVariants({
-
-                    variant,
-
-                    size,
-
-                }),
-
-                className
-
-            )}
-
-            disabled={loading || props.disabled}
-
-            {...props}
-
-        >
-
-            {
-
-                loading ?
-
-                <LoaderCircle
-
-                    className="mr-2 h-4 w-4 animate-spin"
-
-                />
-
-                :
-
-                icon
-
-            }
-
-            {children}
-
-        </button>
-
-    );
-
+      <span>{children}</span>
+    </button>
+  );
 }

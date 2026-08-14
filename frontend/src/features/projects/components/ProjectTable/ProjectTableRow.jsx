@@ -10,6 +10,12 @@ export default function ProjectTableRow({
   onEdit,
   onDelete,
 }) {
+  const createdBy =
+    project.created_by_name ??
+    project.created_by?.full_name ??
+    project.created_by ??
+    "-";
+
   return (
     <Table.Row>
       <Table.Cell>
@@ -21,19 +27,20 @@ export default function ProjectTableRow({
       </Table.Cell>
 
       <Table.Cell>
-        {truncateText(project.description)}
+        {truncateText(project.description ?? "-")}
       </Table.Cell>
 
       <Table.Cell>
-        {project.created_by}
+        {createdBy}
       </Table.Cell>
 
       <Table.Cell>
         <div className="flex gap-2">
-
           <Button
             size="sm"
             variant="outline"
+            title="Edit Project"
+            aria-label="Edit Project"
             onClick={() => onEdit(project)}
           >
             <Pencil size={16} />
@@ -42,11 +49,12 @@ export default function ProjectTableRow({
           <Button
             size="sm"
             variant="danger"
+            title="Delete Project"
+            aria-label="Delete Project"
             onClick={() => onDelete(project)}
           >
             <Trash2 size={16} />
           </Button>
-
         </div>
       </Table.Cell>
     </Table.Row>

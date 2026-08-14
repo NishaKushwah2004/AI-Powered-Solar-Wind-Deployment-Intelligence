@@ -11,5 +11,10 @@ export function useMapConfig() {
     queryFn: gisService.getConfig,
 
     staleTime: Infinity,
+    gcTime: Infinity,
+
+    retry: 1,
+
+    refetchOnWindowFocus: false,
   });
 }

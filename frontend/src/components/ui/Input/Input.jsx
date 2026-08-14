@@ -2,7 +2,10 @@ import { forwardRef } from "react";
 
 import FormField from "@/components/ui/FormField";
 import { cn } from "@/utils/cn";
-import { FORM_CONTROL, FORM_CONTROL_ERROR } from "../../../constants/formStyles.js";
+import {
+  FORM_CONTROL,
+  FORM_CONTROL_ERROR,
+} from "../../../constants/formStyles.js";
 
 const Input = forwardRef(
   (
@@ -19,6 +22,10 @@ const Input = forwardRef(
     },
     ref
   ) => {
+    const errorId = error
+      ? `${id}-error`
+      : undefined;
+
     return (
       <FormField
         id={id}
@@ -29,7 +36,7 @@ const Input = forwardRef(
       >
         <div className="relative">
           {leftIcon && (
-            <div className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">
+            <div className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">
               {leftIcon}
             </div>
           )}
@@ -37,17 +44,18 @@ const Input = forwardRef(
           <input
             ref={ref}
             id={id}
+            aria-invalid={!!error}
+            aria-describedby={errorId}
             className={cn(
               FORM_CONTROL,
               error && FORM_CONTROL_ERROR,
               className
             )}
-            aria-invalid={!!error}
             {...props}
           />
 
           {rightIcon && (
-            <div className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400">
+            <div className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-slate-400">
               {rightIcon}
             </div>
           )}

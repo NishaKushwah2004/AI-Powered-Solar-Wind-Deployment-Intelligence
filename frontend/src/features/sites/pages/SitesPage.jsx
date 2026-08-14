@@ -20,7 +20,8 @@ export default function SitesPage() {
 
   const [search, setSearch] = useState("");
 
-  const [selectedSite, setSelectedSite] = useState(null);
+  const [selectedSite, setSelectedSite] =
+    useState(null);
 
   const {
     data: sites = [],
@@ -32,11 +33,17 @@ export default function SitesPage() {
   const deleteMutation = useDeleteSite();
 
   const filteredSites = useMemo(() => {
-    return sites.filter((site) =>
-      site.name
-        .toLowerCase()
-        .includes(search.toLowerCase())
-    );
+    const query = search.trim().toLowerCase();
+
+    if (!query) return sites;
+
+    return sites.filter((site) => {
+      return (
+        site.name?.toLowerCase().includes(query) ||
+        site.description?.toLowerCase().includes(query) ||
+        site.project_name?.toLowerCase().includes(query)
+      );
+    });
   }, [sites, search]);
 
   function handleCreate() {
@@ -44,7 +51,27 @@ export default function SitesPage() {
   }
 
   function handleEdit(site) {
-    navigate(ROUTES.siteEdit(site.id));
+    navigate(
+      ROUTES.siteEdit(site.id)
+    );
+  }
+
+  function handleEnvironment(site) {
+    navigate(
+      ROUTES.environment(site.id)
+    );
+  }
+
+  function handleAssessment(site) {
+    navigate(
+      ROUTES.assessment(site.id)
+    );
+  }
+
+  function handlePrediction(site) {
+    navigate(
+      ROUTES.prediction(site.id)
+    );
   }
 
   function handleDelete(site) {
@@ -52,9 +79,13 @@ export default function SitesPage() {
   }
 
   function confirmDelete() {
-    deleteMutation.mutate(selectedSite.id);
+    if (!selectedSite) return;
 
-    setSelectedSite(null);
+    deleteMutation.mutate(selectedSite.id, {
+      onSuccess: () => {
+        setSelectedSite(null);
+      },
+    });
   }
 
   return (
@@ -76,13 +107,24 @@ export default function SitesPage() {
           sites={filteredSites}
           onEdit={handleEdit}
           onDelete={handleDelete}
+          onEnvironment={
+            handleEnvironment
+          }
+          onAssessment={
+            handleAssessment
+          }
+          onPrediction={
+            handlePrediction
+          }
         />
       </DataState>
 
       <DeleteSiteDialog
         open={!!selectedSite}
         siteName={selectedSite?.name}
-        onClose={() => setSelectedSite(null)}
+        onClose={() =>
+          setSelectedSite(null)
+        }
         onConfirm={confirmDelete}
       />
     </>

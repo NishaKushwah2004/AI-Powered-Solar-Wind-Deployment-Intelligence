@@ -1,9 +1,11 @@
 import {
   CTA,
-  Features,
+  Capabilities,
+  Workflow,
   Footer,
   Hero,
-  Modules,
+  Statistics,
+  WhyChooseUs,
 } from "../components";
 
 export default function LandingPage() {
@@ -12,9 +14,13 @@ export default function LandingPage() {
 
       <Hero />
 
-      <Features />
+      <Statistics />
 
-      <Modules />
+      <Capabilities />
+
+      <Workflow />
+
+      <WhyChooseUs />
 
       <CTA />
 

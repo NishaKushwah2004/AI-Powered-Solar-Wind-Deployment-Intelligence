@@ -39,13 +39,15 @@ export default function GISPage() {
     sitesLoading;
 
   const error =
-    configErrorObject ||
+    configErrorObject ??
     sitesErrorObject;
 
-  function handleRefresh() {
-    refetchConfig();
-    refetchSummary();
-    refetchSites();
+  async function handleRefresh() {
+    await Promise.all([
+      refetchConfig(),
+      refetchSummary(),
+      refetchSites(),
+    ]);
   }
 
   return (

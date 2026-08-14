@@ -4,7 +4,7 @@ import LoadingScreen from "@/components/feedback/LoadingScreen";
 
 import { ROUTES } from "@/config/navigation/routes";
 
-import { useAuth } from "@/features/auth/context/AuthContext";
+import { useAuth } from "@/features/auth/context/useAuth";
 
 export default function ProtectedRoute({
   children,

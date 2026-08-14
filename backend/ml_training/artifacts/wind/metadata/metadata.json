@@ -1,0 +1,74 @@
+{
+  "domain": "wind",
+  "schema_version": "1.0",
+  "model_type": "RandomForestRegressor",
+  "model_version": "1.0.0",
+  "features": [
+    "latitude",
+    "longitude",
+    "wind_speed_m_s",
+    "air_density_kg_m3",
+    "temperature_c",
+    "humidity_pct",
+    "pressure_hpa",
+    "elevation_m"
+  ],
+  "feature_count": 8,
+  "target": "wind_generation_mw",
+  "target_unit": "MW",
+  "data_source": "synthetic_reference",
+  "dataset_type": "reference",
+  "training_rows": 1600,
+  "testing_rows": 400,
+  "test_size": 0.2,
+  "random_state": 42,
+  "metrics": {
+    "mae": 0.018501777500000028,
+    "rmse": 0.024060446468547384,
+    "r2": 0.9912660795210696
+  },
+  "trained_at": "2026-08-13T22:28:27.903396+00:00",
+  "preprocessing": {
+    "feature_names": [
+      "latitude",
+      "longitude",
+      "wind_speed_m_s",
+      "air_density_kg_m3",
+      "temperature_c",
+      "humidity_pct",
+      "pressure_hpa",
+      "elevation_m"
+    ],
+    "use_scaler": true,
+    "imputer_medians": {
+      "latitude": 18.355,
+      "longitude": 77.9373,
+      "wind_speed_m_s": 4.025,
+      "air_density_kg_m3": 1.0605,
+      "temperature_c": 21.87,
+      "humidity_pct": 68.93,
+      "pressure_hpa": 896.935,
+      "elevation_m": 1026.7649999999999
+    },
+    "scaler_means": {
+      "latitude": 18.0781915375,
+      "longitude": 77.93150323124999,
+      "wind_speed_m_s": 4.2603687500000005,
+      "air_density_kg_m3": 1.0619595000000002,
+      "temperature_c": 21.9640625,
+      "humidity_pct": 69.14685,
+      "pressure_hpa": 900.0761875,
+      "elevation_m": 1019.1916187500001
+    },
+    "scaler_stds": {
+      "latitude": 5.7249049717688765,
+      "longitude": 5.7824586780469795,
+      "wind_speed_m_s": 2.0899026256356628,
+      "air_density_kg_m3": 0.06205204152290822,
+      "temperature_c": 5.353898440754638,
+      "humidity_pct": 10.410102309598605,
+      "pressure_hpa": 62.20895622304975,
+      "elevation_m": 583.9527569291417
+    }
+  }
+}

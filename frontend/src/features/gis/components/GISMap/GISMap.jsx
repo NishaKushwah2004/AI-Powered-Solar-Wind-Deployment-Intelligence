@@ -5,28 +5,35 @@ import {
   TileLayer,
 } from "react-leaflet";
 
-
 import FitBounds from "./FitBounds";
 
 import SiteMarkerPopup from "../SiteMarkerPopup";
-
 import MapLegend from "../MapLegend";
+
+const DEFAULT_CENTER = [20.5937, 78.9629]; // India
+const DEFAULT_ZOOM = 5;
 
 export default function GISMap({
   config,
   featureCollection,
 }) {
   const features =
-    featureCollection?.features || [];
+    featureCollection?.features ?? [];
 
   return (
-    <div className="relative h-[700px] overflow-hidden rounded-2xl">
-
+    <div className="relative h-175 overflow-hidden rounded-2xl">
       <MapContainer
-        center={config.default_center}
-        zoom={config.default_zoom}
-        minZoom={config.min_zoom}
-        maxZoom={config.max_zoom}
+        center={
+          config?.default_center ??
+          DEFAULT_CENTER
+        }
+        zoom={
+          config?.default_zoom ??
+          DEFAULT_ZOOM
+        }
+        minZoom={config?.min_zoom ?? 3}
+        maxZoom={config?.max_zoom ?? 18}
+        scrollWheelZoom
         className="h-full w-full"
       >
         <TileLayer
@@ -34,34 +41,43 @@ export default function GISMap({
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
         />
 
-        {features.map((feature) => (
-          <Marker
-            key={feature.properties.id}
-            position={[
-              feature.geometry.coordinates[1],
-              feature.geometry.coordinates[0],
-            ]}
-          >
-            <Popup>
+        {features.map((feature, index) => {
+          const coordinates =
+            feature?.geometry?.coordinates;
 
-              <SiteMarkerPopup
-                properties={
-                  feature.properties
-                }
-              />
+          if (
+            !coordinates ||
+            coordinates.length !== 2
+          ) {
+            return null;
+          }
 
-            </Popup>
-          </Marker>
-        ))}
+          return (
+            <Marker
+              key={
+                feature.properties?.id ??
+                index
+              }
+              position={[
+                coordinates[1],
+                coordinates[0],
+              ]}
+            >
+              <Popup>
+                <SiteMarkerPopup
+                  properties={
+                    feature.properties
+                  }
+                />
+              </Popup>
+            </Marker>
+          );
+        })}
 
-        <FitBounds
-          features={features}
-        />
-
+        <FitBounds features={features} />
       </MapContainer>
 
       <MapLegend />
-
     </div>
   );
 }
