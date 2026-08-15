@@ -2,8 +2,12 @@ from __future__ import annotations
 
 from typing import Any
 
-from ml_core.preprocessing.feature_preparation import prepare_prediction_record
+from ml_core.preprocessing.feature_preparation import (
+    prepare_prediction_record,
+)
+
 from app.ml.inference.model_loader import MLModelLoader
+
 from app.schemas.ml_prediction import (
     WindPredictionRequest,
     PredictionResponse,
@@ -12,27 +16,22 @@ from app.schemas.ml_prediction import (
 
 class WindPredictor:
     """
-    Wind ML inference adapter.
+    Production Wind ML inference adapter.
 
-    Responsibilities:
-        - accept the authoritative wind prediction request
-        - construct the ML feature record
-        - delegate inference to the ML model loader
-        - return the model prediction
+    Uses only the trained observed-data wind model.
 
-    This class MUST NOT:
-        - call WindService
-        - execute a turbine power curve
-        - calculate heuristic capacity factors
-        - calculate annual energy using formulas
-        - provide an ML fallback
+    No:
+        - turbine power curve
+        - capacity-factor formula
+        - heuristic prediction
+        - synthetic fallback
     """
 
     domain = "wind"
 
     def __init__(
         self,
-        model_loader: MLModelLoader,
+        model_loader: type[MLModelLoader],
     ) -> None:
         self.model_loader = model_loader
 
@@ -40,9 +39,6 @@ class WindPredictor:
         self,
         data: WindPredictionRequest,
     ) -> PredictionResponse:
-        """
-        Execute wind ML inference.
-        """
 
         record: dict[str, Any] = {
             "latitude": data.latitude,
@@ -55,26 +51,25 @@ class WindPredictor:
             "elevation_m": data.elevation_m,
         }
 
-        # Uses the authoritative feature contract and guarantees
-        # the correct feature ordering.
-        prepare_prediction_record(
+        features = prepare_prediction_record(
             record,
             self.domain,
         )
 
         result = self.model_loader.predict(
-            record,
+            features,
             self.domain,
         )
 
         return PredictionResponse(
             domain=self.domain,
-            prediction_mw=float(result["prediction"]),
-            model_version=str(result["model_version"]),
+            prediction_mw=float(
+                result["prediction"]
+            ),
+            model_version=str(
+                result["model_version"]
+            ),
             data_source=str(
-                result.get(
-                    "data_source",
-                    "synthetic_reference",
-                )
+                result["data_source"]
             ),
         )

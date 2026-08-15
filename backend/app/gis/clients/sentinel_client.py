@@ -3,39 +3,10 @@ import logging
 import requests
 
 from app.core.config import settings
-from app.environmental.constants import REQUEST_TIMEOUT
-from app.environmental.exceptions import SentinelServiceError
+from app.gis.exceptions import SentinelServiceError
 
 logger = logging.getLogger(__name__)
 
-
-# ---------------------------------------------------------------
-# Copernicus Sentinel Hub Integration
-# ---------------------------------------------------------------
-#
-# This client is designed against the Sentinel Hub Statistical
-# API (Copernicus Data Space Ecosystem), which is the standard
-# way to derive a Vegetation Index (NDVI) and basic land-cover
-# signal for a point/area of interest from Sentinel-2 imagery.
-#
-# Real integration flow:
-#   1. OAuth2 client-credentials grant against
-#      https://identity.dataspace.copernicus.eu/auth/realms/
-#      CDSE/protocol/openid-connect/token
-#      using SENTINEL_CLIENT_ID / SENTINEL_CLIENT_SECRET.
-#   2. POST a small bounding box (built from latitude/longitude)
-#      plus an NDVI evalscript to the Statistical API:
-#      https://sh.dataspace.copernicus.eu/api/v1/statistics
-#   3. Parse the returned per-band statistics and take the
-#      mean NDVI value for the requested time window as the
-#      site's vegetation index.
-#
-# Because Sentinel Hub requires a paid/registered account,
-# credentials are optional in this environment. When they are
-# not configured, this client returns `None` rather than
-# raising, so the rest of the Environmental Data Engine keeps
-# working using NASA POWER, OpenWeather, OSM and Elevation data.
-# ---------------------------------------------------------------
 
 SENTINEL_TOKEN_URL = (
     "https://identity.dataspace.copernicus.eu/auth/realms/"
@@ -46,13 +17,18 @@ SENTINEL_STATISTICS_URL = (
     "https://sh.dataspace.copernicus.eu/api/v1/statistics"
 )
 
+REQUEST_TIMEOUT = 30
+
 
 class SentinelClient:
     """
     Client for Copernicus Sentinel Hub.
 
-    Retrieves a vegetation index (NDVI) for a site, used by the
-    Environmental Data Engine / Geographic Intelligence Engine.
+    Provides satellite-derived vegetation information
+    such as NDVI for GIS enrichment.
+
+    This client does not calculate GIS suitability,
+    infrastructure scores, or deployment scores.
     """
 
     def is_configured(self) -> bool:
@@ -61,7 +37,15 @@ class SentinelClient:
             and settings.SENTINEL_CLIENT_SECRET
         )
 
-    def _get_access_token(self) -> str | None:
+    def _get_access_token(self) -> str:
+        """
+        Obtain a Sentinel Hub OAuth2 access token.
+        """
+
+        if not self.is_configured():
+            raise SentinelServiceError(
+                "Sentinel Hub credentials are not configured."
+            )
 
         try:
             response = requests.post(
@@ -76,12 +60,29 @@ class SentinelClient:
 
             response.raise_for_status()
 
-            return response.json().get("access_token")
+            token = response.json().get("access_token")
+
+            if not token:
+                raise SentinelServiceError(
+                    "Sentinel Hub response did not contain an access token."
+                )
+
+            return token
+
+        except requests.Timeout as exc:
+            logger.exception(
+                "Sentinel Hub authentication timed out."
+            )
+
+            raise SentinelServiceError(
+                "Sentinel Hub authentication timed out."
+            ) from exc
 
         except requests.RequestException as exc:
             logger.exception(
                 "Sentinel Hub authentication failed."
             )
+
             raise SentinelServiceError(
                 f"Sentinel Hub authentication failed: {exc}"
             ) from exc
@@ -92,18 +93,19 @@ class SentinelClient:
         longitude: float,
     ) -> float | None:
         """
-        Retrieve the NDVI-based vegetation index for a site.
+        Retrieve mean NDVI for a site.
 
-        Returns None when Sentinel Hub credentials are not
-        configured, instead of failing the request - satellite
-        land-cover data is treated as an enhancement, not a
-        hard dependency, for Milestone 2.
+        NDVI is treated as GIS enrichment data.
+
+        Returns None when:
+        - Sentinel is not configured
+        - no valid satellite observations exist
         """
 
         if not self.is_configured():
             logger.info(
-                "Sentinel Hub credentials not configured; "
-                "skipping vegetation index lookup for (%s, %s).",
+                "Sentinel Hub is not configured. "
+                "Skipping NDVI lookup for (%s, %s).",
                 latitude,
                 longitude,
             )
@@ -112,11 +114,6 @@ class SentinelClient:
         try:
             token = self._get_access_token()
 
-            if token is None:
-                return None
-
-            # A small bounding box (~500m) around the site,
-            # as required by the Statistical API.
             offset = 0.005
 
             request_body = {
@@ -130,13 +127,15 @@ class SentinelClient:
                         ]
                     },
                     "data": [
-                        {"type": "sentinel-2-l2a"}
+                        {
+                            "type": "sentinel-2-l2a"
+                        }
                     ],
                 },
                 "aggregation": {
                     "timeRange": {
                         "from": "2024-01-01T00:00:00Z",
-                        "to": "2024-12-31T00:00:00Z",
+                        "to": "2024-12-31T23:59:59Z",
                     },
                     "aggregationInterval": {
                         "of": "P1D",
@@ -149,9 +148,13 @@ class SentinelClient:
                         "    output: { bands: 1 }\n"
                         "  };\n"
                         "}\n"
-                        "function evaluatePixel(s) {\n"
-                        "  let ndvi = (s.B08 - s.B04) / "
-                        "(s.B08 + s.B04);\n"
+                        "function evaluatePixel(sample) {\n"
+                        "  let denominator = sample.B08 + sample.B04;\n"
+                        "  if (denominator === 0) {\n"
+                        "    return [0];\n"
+                        "  }\n"
+                        "  let ndvi = "
+                        "(sample.B08 - sample.B04) / denominator;\n"
                         "  return [ndvi];\n"
                         "}"
                     ),
@@ -163,6 +166,7 @@ class SentinelClient:
                 json=request_body,
                 headers={
                     "Authorization": f"Bearer {token}",
+                    "Content-Type": "application/json",
                 },
                 timeout=REQUEST_TIMEOUT,
             )
@@ -173,15 +177,33 @@ class SentinelClient:
 
             intervals = data.get("data", [])
 
-            ndvi_values = [
-                interval["outputs"]["default"]["bands"]["B0"][
-                    "stats"
-                ]["mean"]
-                for interval in intervals
-                if "outputs" in interval
-            ]
+            ndvi_values = []
+
+            for interval in intervals:
+                try:
+                    mean = (
+                        interval
+                        .get("outputs", {})
+                        .get("default", {})
+                        .get("bands", {})
+                        .get("B0", {})
+                        .get("stats", {})
+                        .get("mean")
+                    )
+
+                    if mean is not None:
+                        ndvi_values.append(float(mean))
+
+                except (TypeError, ValueError):
+                    continue
 
             if not ndvi_values:
+                logger.info(
+                    "No valid NDVI observations returned for "
+                    "(%s, %s).",
+                    latitude,
+                    longitude,
+                )
                 return None
 
             return round(
@@ -192,10 +214,29 @@ class SentinelClient:
         except SentinelServiceError:
             raise
 
-        except (requests.RequestException, KeyError, ValueError) as exc:
+        except requests.Timeout as exc:
             logger.exception(
-                "Sentinel Hub vegetation index request failed."
+                "Sentinel Hub request timed out."
             )
+
+            raise SentinelServiceError(
+                "Sentinel Hub request timed out."
+            ) from exc
+
+        except requests.RequestException as exc:
+            logger.exception(
+                "Sentinel Hub request failed."
+            )
+
             raise SentinelServiceError(
                 f"Sentinel Hub request failed: {exc}"
+            ) from exc
+
+        except (KeyError, TypeError, ValueError) as exc:
+            logger.exception(
+                "Invalid Sentinel Hub response."
+            )
+
+            raise SentinelServiceError(
+                f"Invalid Sentinel Hub response: {exc}"
             ) from exc

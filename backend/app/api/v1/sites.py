@@ -1,23 +1,30 @@
 from fastapi import APIRouter, Depends
-from sqlalchemy.orm import Session
 
-from app.api.deps import get_db
+from app.api.deps import get_site_service
+
 from app.auth.dependencies import get_current_user
 from app.auth.permissions import require_roles
+
 from app.models.user import User
-from app.repositories.project_repository import ProjectRepository
-from app.repositories.site_repository import SiteRepository
+
 from app.schemas.site import (
     SiteCreate,
-    SiteUpdate,
     SiteResponse,
+    SiteUpdate,
 )
+
 from app.services.site_service import SiteService
+
 
 router = APIRouter(
     prefix="/sites",
     tags=["Sites"],
 )
+
+
+# =========================================================
+# CREATE SITE
+# =========================================================
 
 @router.post(
     "",
@@ -25,7 +32,11 @@ router = APIRouter(
 )
 def create_site(
     site_data: SiteCreate,
-    db: Session = Depends(get_db),
+
+    service: SiteService = Depends(
+        get_site_service,
+    ),
+
     current_user: User = Depends(
         require_roles(
             "Admin",
@@ -33,52 +44,55 @@ def create_site(
         )
     ),
 ):
-    site_repository = SiteRepository(db)
-    project_repository = ProjectRepository(db)
+    """
+    Create a site and automatically enrich it with
+    GIS/environmental data.
 
-    service = SiteService(
-        site_repository=site_repository,
-        project_repository=project_repository,
+    Flow:
+        POST /sites
+            ↓
+        SiteService.create_site()
+            ↓
+        Save basic site record
+            ↓
+        GISEnrichmentService.enrich_site()
+            ↓
+        Update GIS/environmental fields
+            ↓
+        Return complete SiteResponse
+    """
+
+    return service.create_site(
+        site_data,
+        current_user,
     )
 
-    return service.create_site(site_data)
+
+# =========================================================
+# GET ALL SITES
+# =========================================================
 
 @router.get(
     "",
     response_model=list[SiteResponse],
 )
 def get_all_sites(
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
-):
-    site_repository = SiteRepository(db)
-    project_repository = ProjectRepository(db)
+    service: SiteService = Depends(
+        get_site_service,
+    ),
 
-    service = SiteService(
-        site_repository=site_repository,
-        project_repository=project_repository,
+    current_user: User = Depends(
+        get_current_user,
+    ),
+):
+    return service.get_all_sites(
+        current_user,
     )
 
-    return service.get_all_sites()
 
-@router.get(
-    "/{site_id}",
-    response_model=SiteResponse,
-)
-def get_site(
-    site_id: int,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
-):
-    site_repository = SiteRepository(db)
-    project_repository = ProjectRepository(db)
-
-    service = SiteService(
-        site_repository=site_repository,
-        project_repository=project_repository,
-    )
-
-    return service.get_site_by_id(site_id)
+# =========================================================
+# GET SITES BY PROJECT
+# =========================================================
 
 @router.get(
     "/project/{project_id}",
@@ -86,18 +100,49 @@ def get_site(
 )
 def get_sites_by_project(
     project_id: int,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
-):
-    site_repository = SiteRepository(db)
-    project_repository = ProjectRepository(db)
 
-    service = SiteService(
-        site_repository=site_repository,
-        project_repository=project_repository,
+    service: SiteService = Depends(
+        get_site_service,
+    ),
+
+    current_user: User = Depends(
+        get_current_user,
+    ),
+):
+    return service.get_sites_by_project(
+        project_id,
+        current_user,
     )
 
-    return service.get_sites_by_project(project_id)
+
+# =========================================================
+# GET SITE BY ID
+# =========================================================
+
+@router.get(
+    "/{site_id}",
+    response_model=SiteResponse,
+)
+def get_site(
+    site_id: int,
+
+    service: SiteService = Depends(
+        get_site_service,
+    ),
+
+    current_user: User = Depends(
+        get_current_user,
+    ),
+):
+    return service.get_site_by_id(
+        site_id,
+        current_user,
+    )
+
+
+# =========================================================
+# UPDATE SITE
+# =========================================================
 
 @router.put(
     "/{site_id}",
@@ -106,7 +151,11 @@ def get_sites_by_project(
 def update_site(
     site_id: int,
     site_data: SiteUpdate,
-    db: Session = Depends(get_db),
+
+    service: SiteService = Depends(
+        get_site_service,
+    ),
+
     current_user: User = Depends(
         require_roles(
             "Admin",
@@ -114,33 +163,41 @@ def update_site(
         )
     ),
 ):
-    site_repository = SiteRepository(db)
-    project_repository = ProjectRepository(db)
+    """
+    Update a site.
 
-    service = SiteService(
-        site_repository=site_repository,
-        project_repository=project_repository,
-    )
+    If latitude or longitude changes,
+    SiteService re-runs GIS/environmental enrichment.
+    """
 
     return service.update_site(
         site_id,
         site_data,
+        current_user,
     )
 
-@router.delete("/{site_id}")
+
+# =========================================================
+# DELETE SITE
+# =========================================================
+
+@router.delete(
+    "/{site_id}",
+)
 def delete_site(
     site_id: int,
-    db: Session = Depends(get_db),
+
+    service: SiteService = Depends(
+        get_site_service,
+    ),
+
     current_user: User = Depends(
-        require_roles("Admin")
+        require_roles(
+            "Admin",
+        )
     ),
 ):
-    site_repository = SiteRepository(db)
-    project_repository = ProjectRepository(db)
-
-    service = SiteService(
-        site_repository=site_repository,
-        project_repository=project_repository,
+    return service.delete_site(
+        site_id,
+        current_user,
     )
-
-    return service.delete_site(site_id)

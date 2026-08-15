@@ -4,9 +4,10 @@ from fastapi import (
     HTTPException,
     status,
 )
-from sqlalchemy.orm import Session
 
-from app.api.deps import get_db
+from app.api.deps import (
+    get_energy_forecasting_service,
+)
 
 from app.auth.permissions import require_roles
 
@@ -31,8 +32,11 @@ router = APIRouter(
 )
 def forecast_site_energy(
     site_id: int,
-    intelligence: dict,
-    db: Session = Depends(get_db),
+
+    service: EnergyForecastingService = Depends(
+        get_energy_forecasting_service,
+    ),
+
     current_user=Depends(
         require_roles(
             "Renewable Energy Planner",
@@ -43,13 +47,10 @@ def forecast_site_energy(
     ),
 ):
 
-    service = EnergyForecastingService(db)
-
     try:
 
         return service.forecast(
             site_id=site_id,
-            intelligence=intelligence,
         )
 
     except ValueError as exc:

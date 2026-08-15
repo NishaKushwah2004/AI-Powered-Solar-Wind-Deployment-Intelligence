@@ -1,14 +1,37 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import (
+    APIRouter,
+    Depends,
+    HTTPException,
+    status,
+)
+
 from sqlalchemy.orm import Session
 
-from app.api.deps import get_db
-from app.schemas.suitability import SiteSuitabilityResponse
+from app.api.deps import (
+    get_db,
+    get_environmental_service,
+    get_prediction_service,
+)
+
+from app.auth.permissions import (
+    require_roles,
+)
+
+from app.prediction.services.prediction_service import (
+    PredictionService,
+)
+
+from app.schemas.suitability import (
+    SiteSuitabilityResponse,
+)
+
+from app.services.environmental_service import (
+    EnvironmentalService,
+)
+
 from app.services.site_suitability_service import (
     SiteSuitabilityService,
 )
-
-# Reuse your existing authentication / RBAC implementation.
-from app.auth.permissions import require_roles
 
 
 router = APIRouter(
@@ -23,8 +46,19 @@ router = APIRouter(
 )
 def evaluate_site_suitability(
     site_id: int,
-    intelligence: dict,
-    db: Session = Depends(get_db),
+
+    db: Session = Depends(
+        get_db,
+    ),
+
+    environmental_service: EnvironmentalService = Depends(
+        get_environmental_service,
+    ),
+
+    prediction_service: PredictionService = Depends(
+        get_prediction_service,
+    ),
+
     current_user=Depends(
         require_roles(
             "Renewable Energy Planner",
@@ -35,12 +69,16 @@ def evaluate_site_suitability(
     ),
 ):
 
-    service = SiteSuitabilityService(db)
+    service = SiteSuitabilityService(
+        db=db,
+        environmental_service=environmental_service,
+        prediction_service=prediction_service,
+    )
 
     try:
+
         return service.evaluate_site(
             site_id=site_id,
-            intelligence=intelligence,
         )
 
     except ValueError as exc:

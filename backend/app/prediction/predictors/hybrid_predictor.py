@@ -1,6 +1,9 @@
 from __future__ import annotations
 
-from app.schemas.ml_prediction import PredictionResponse
+from app.schemas.ml_prediction import (
+    PredictionResponse,
+)
+
 from app.schemas.unified_prediction import (
     RenewablePredictionResponse,
 )
@@ -8,20 +11,9 @@ from app.schemas.unified_prediction import (
 
 class HybridPredictor:
     """
-    Combines independent solar and wind ML predictions.
+    Combines independent Solar and Wind ML predictions.
 
-    Responsibilities:
-        - combine solar ML output
-        - combine wind ML output
-        - calculate total renewable generation
-
-    Does NOT:
-        - load ML models
-        - perform solar prediction
-        - perform wind prediction
-        - execute heuristic logic
-        - call SolarService
-        - call WindService
+    This class performs no ML inference and no heuristics.
     """
 
     def predict(
@@ -31,9 +23,6 @@ class HybridPredictor:
         latitude: float,
         longitude: float,
     ) -> RenewablePredictionResponse:
-        """
-        Combine solar and wind ML predictions.
-        """
 
         if solar_prediction.domain != "solar":
             raise ValueError(

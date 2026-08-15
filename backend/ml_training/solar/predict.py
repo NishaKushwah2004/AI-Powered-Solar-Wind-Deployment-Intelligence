@@ -1,17 +1,13 @@
 """
-Solar model inference.
+Solar ML inference.
 
-Run:
-
-    python -m ml_training.solar.predict
+Uses trained artifacts produced exclusively
+from observed data.
 """
 
 from __future__ import annotations
 
-from pathlib import Path
-
 import joblib
-import pandas as pd
 
 from ml_core.preprocessing.feature_preparation import (
     prepare_prediction_record,
@@ -24,7 +20,9 @@ from ml_training.solar.config import (
 
 
 def load_artifacts():
-    """Load trained Solar model and preprocessor."""
+    """
+    Load the trained Solar ML artifacts.
+    """
 
     if not MODEL_PATH.exists():
         raise FileNotFoundError(
@@ -33,7 +31,7 @@ def load_artifacts():
 
     if not PREPROCESSOR_PATH.exists():
         raise FileNotFoundError(
-            f"Solar preprocessor not found: "
+            "Solar preprocessor not found: "
             f"{PREPROCESSOR_PATH}"
         )
 
@@ -52,7 +50,11 @@ def predict_solar(
     record: dict,
 ) -> float:
     """
-    Generate Solar power prediction in MW.
+    Generate Solar prediction using
+    the trained observed-data model.
+
+    No heuristic calculation.
+    No synthetic fallback.
     """
 
     model, preprocessor = load_artifacts()
@@ -76,18 +78,17 @@ def predict_solar(
 if __name__ == "__main__":
 
     sample = {
-        "latitude": 13.34,
-        "longitude": 77.10,
-        "ghi": 5.2,
-        "dni": 4.8,
-        "dhi": 1.1,
-        "gti": 5.5,
-        "temperature_c": 28.0,
-        "humidity_pct": 45.0,
+        "latitude": 23.25,
+        "longitude": 79.95,
+        "ghi": 650.0,
+        "dni": 500.0,
+        "dhi": 150.0,
+        "temperature_c": 27.0,
+        "humidity_pct": 55.0,
         "cloud_cover_pct": 20.0,
-        "pressure_hpa": 1008.0,
-        "wind_speed_m_s": 4.5,
-        "elevation_m": 890.0,
+        "pressure_hpa": 950.0,
+        "wind_speed_m_s": 4.0,
+        "elevation_m": 400.0,
     }
 
     prediction = predict_solar(
@@ -95,6 +96,6 @@ if __name__ == "__main__":
     )
 
     print(
-        f"Predicted Solar Generation: "
+        "Predicted Solar Generation: "
         f"{prediction:.4f} MW"
     )

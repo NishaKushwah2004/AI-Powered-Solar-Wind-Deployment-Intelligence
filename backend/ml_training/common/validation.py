@@ -1,7 +1,3 @@
-"""
-Dataset validation utilities for Solar and Wind ML training.
-"""
-
 from __future__ import annotations
 
 from pathlib import Path
@@ -17,13 +13,10 @@ from ml_core.contracts.feature_contracts import (
 
 
 class DatasetValidationError(ValueError):
-    """Raised when a training dataset violates the ML contract."""
+    pass
 
 
 def load_dataset(path: str | Path) -> pd.DataFrame:
-    """
-    Load a CSV dataset.
-    """
 
     path = Path(path)
 
@@ -51,25 +44,21 @@ def validate_columns(
     dataframe: pd.DataFrame,
     domain: str,
 ) -> None:
-    """
-    Validate required feature and target columns.
-    """
 
     features = get_features(domain)
     target = get_target(domain)
 
-    required_columns = [*features, target]
+    required = [*features, target]
 
     missing = [
         column
-        for column in required_columns
+        for column in required
         if column not in dataframe.columns
     ]
 
     if missing:
         raise DatasetValidationError(
-            f"{domain.capitalize()} dataset is missing "
-            f"required columns: {missing}"
+            f"{domain} dataset missing columns: {missing}"
         )
 
 
@@ -77,30 +66,27 @@ def validate_numeric_columns(
     dataframe: pd.DataFrame,
     domain: str,
 ) -> None:
-    """
-    Ensure all ML features and target are numeric.
-    """
 
     columns = [
         *get_features(domain),
         get_target(domain),
     ]
 
-    invalid_columns: list[str] = []
+    invalid = []
 
     for column in columns:
+
         converted = pd.to_numeric(
             dataframe[column],
             errors="coerce",
         )
 
         if converted.isna().any():
-            invalid_columns.append(column)
+            invalid.append(column)
 
-    if invalid_columns:
+    if invalid:
         raise DatasetValidationError(
-            f"Non-numeric or invalid values found in "
-            f"{domain} columns: {invalid_columns}"
+            f"Invalid numeric values in {domain}: {invalid}"
         )
 
 
@@ -108,29 +94,23 @@ def validate_missing_values(
     dataframe: pd.DataFrame,
     domain: str,
 ) -> None:
-    """
-    Check missing values in required model columns.
-
-    Missing values are currently treated as a validation failure
-    so that preprocessing does not silently hide dataset problems.
-    """
 
     columns = [
         *get_features(domain),
         get_target(domain),
     ]
 
-    missing_counts = dataframe[columns].isna().sum()
+    missing = dataframe[columns].isna().sum()
 
-    missing = {
+    problems = {
         column: int(count)
-        for column, count in missing_counts.items()
+        for column, count in missing.items()
         if count > 0
     }
 
-    if missing:
+    if problems:
         raise DatasetValidationError(
-            f"Missing values found in {domain} dataset: {missing}"
+            f"Missing values in {domain}: {problems}"
         )
 
 
@@ -138,13 +118,8 @@ def validate_ranges(
     dataframe: pd.DataFrame,
     domain: str,
 ) -> None:
-    """
-    Validate known physical/numerical ranges.
-    """
 
-    columns = get_features(domain)
-
-    for column in columns:
+    for column in get_features(domain):
 
         if column not in FEATURE_RANGES:
             continue
@@ -156,23 +131,24 @@ def validate_ranges(
             errors="coerce",
         )
 
-        invalid_mask = (
+        invalid = (
             (values < minimum)
             | (values > maximum)
         )
 
-        invalid_count = int(invalid_mask.sum())
+        count = int(invalid.sum())
 
-        if invalid_count:
+        if count:
             raise DatasetValidationError(
-                f"{domain} feature '{column}' contains "
-                f"{invalid_count} values outside the valid range "
-                f"[{minimum}, {maximum}]."
+                f"{domain} feature '{column}' has "
+                f"{count} values outside "
+                f"[{minimum}, {maximum}]"
             )
 
     target = get_target(domain)
 
     if target in TARGET_RANGES:
+
         minimum, maximum = TARGET_RANGES[target]
 
         values = pd.to_numeric(
@@ -180,18 +156,18 @@ def validate_ranges(
             errors="coerce",
         )
 
-        invalid_mask = (
+        invalid = (
             (values < minimum)
             | (values > maximum)
         )
 
-        invalid_count = int(invalid_mask.sum())
+        count = int(invalid.sum())
 
-        if invalid_count:
+        if count:
             raise DatasetValidationError(
-                f"{domain} target '{target}' contains "
-                f"{invalid_count} values outside the valid range "
-                f"[{minimum}, {maximum}]."
+                f"{domain} target '{target}' has "
+                f"{count} values outside "
+                f"[{minimum}, {maximum}]"
             )
 
 
@@ -199,21 +175,17 @@ def validate_target_variance(
     dataframe: pd.DataFrame,
     domain: str,
 ) -> None:
-    """
-    Ensure the target contains meaningful variation.
-    """
 
     target = get_target(domain)
 
     if dataframe[target].nunique() < 2:
         raise DatasetValidationError(
-            f"{domain} target '{target}' has fewer than "
-            f"2 unique values."
+            f"{domain} target has fewer than 2 unique values."
         )
 
     if float(dataframe[target].std()) == 0.0:
         raise DatasetValidationError(
-            f"{domain} target '{target}' has zero variance."
+            f"{domain} target has zero variance."
         )
 
 
@@ -221,36 +193,14 @@ def validate_dataset(
     dataframe: pd.DataFrame,
     domain: str,
 ) -> dict:
-    """
-    Run the complete Phase 1 validation pipeline.
-    """
 
     domain = domain.lower().strip()
 
-    validate_columns(
-        dataframe,
-        domain,
-    )
-
-    validate_numeric_columns(
-        dataframe,
-        domain,
-    )
-
-    validate_missing_values(
-        dataframe,
-        domain,
-    )
-
-    validate_ranges(
-        dataframe,
-        domain,
-    )
-
-    validate_target_variance(
-        dataframe,
-        domain,
-    )
+    validate_columns(dataframe, domain)
+    validate_numeric_columns(dataframe, domain)
+    validate_missing_values(dataframe, domain)
+    validate_ranges(dataframe, domain)
+    validate_target_variance(dataframe, domain)
 
     return {
         "valid": True,
@@ -259,14 +209,7 @@ def validate_dataset(
         "features": len(get_features(domain)),
         "feature_names": get_features(domain),
         "target": get_target(domain),
-        "missing_values": int(
-            dataframe[
-                [*get_features(domain), get_target(domain)]
-            ]
-            .isna()
-            .sum()
-            .sum()
-        ),
+        "missing_values": 0,
     }
 
 
@@ -274,9 +217,6 @@ def validate_dataset_file(
     path: str | Path,
     domain: str,
 ) -> dict:
-    """
-    Load and validate a dataset file.
-    """
 
     dataframe = load_dataset(path)
 
@@ -289,23 +229,15 @@ def validate_dataset_file(
 def print_validation_report(
     report: dict,
 ) -> None:
-    """
-    Print a compact validation report.
-    """
 
     print("=" * 60)
-    print(
-        f"{report['domain'].upper()} DATASET VALIDATION"
-    )
+    print(f"{report['domain'].upper()} DATASET")
     print("=" * 60)
 
-    print(f"Status: {'PASS' if report['valid'] else 'FAIL'}")
+    print("Status: PASS")
     print(f"Rows: {report['rows']}")
     print(f"Features: {report['features']}")
     print(f"Target: {report['target']}")
-    print(
-        f"Missing values: {report['missing_values']}"
-    )
 
     print("\nFeatures:")
 

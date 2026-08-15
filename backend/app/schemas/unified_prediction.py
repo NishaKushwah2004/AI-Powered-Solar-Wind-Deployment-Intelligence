@@ -4,10 +4,6 @@ from pydantic import BaseModel, Field
 
 
 class RenewablePredictionRequest(BaseModel):
-    """
-    Unified request containing all features required by
-    the solar and wind models.
-    """
 
     latitude: float = Field(
         ...,
@@ -21,33 +17,17 @@ class RenewablePredictionRequest(BaseModel):
         le=180,
     )
 
-    # ---------------------------------------------------------
+    # -------------------------
     # Solar
-    # ---------------------------------------------------------
+    # -------------------------
 
-    ghi: float = Field(
-        ...,
-        ge=0,
-    )
+    ghi: float = Field(..., ge=0)
+    dni: float = Field(..., ge=0)
+    dhi: float = Field(..., ge=0)
 
-    dni: float = Field(
-        ...,
-        ge=0,
-    )
-
-    dhi: float = Field(
-        ...,
-        ge=0,
-    )
-
-    gti: float = Field(
-        ...,
-        ge=0,
-    )
-
-    # ---------------------------------------------------------
-    # Shared environmental
-    # ---------------------------------------------------------
+    # -------------------------
+    # Environment
+    # -------------------------
 
     temperature_c: float
 
@@ -75,9 +55,9 @@ class RenewablePredictionRequest(BaseModel):
 
     elevation_m: float
 
-    # ---------------------------------------------------------
+    # -------------------------
     # Wind
-    # ---------------------------------------------------------
+    # -------------------------
 
     air_density_kg_m3: float = Field(
         ...,
@@ -86,18 +66,12 @@ class RenewablePredictionRequest(BaseModel):
 
 
 class RenewablePredictionResponse(BaseModel):
-    """
-    Combined ML prediction response.
-    """
 
     latitude: float
-
     longitude: float
 
     solar_generation_mw: float
-
     wind_generation_mw: float
-
     total_generation_mw: float
 
     model_version: str

@@ -1,11 +1,8 @@
-from fastapi import (
-    APIRouter,
-    Depends,
+from fastapi import APIRouter, Depends
+
+from app.api.deps import (
+    get_planner_dashboard_service,
 )
-
-from sqlalchemy.orm import Session
-
-from app.api.deps import get_db
 
 from app.auth.permissions import require_roles
 
@@ -30,8 +27,8 @@ router = APIRouter(
 )
 def get_planner_dashboard(
 
-    db: Session = Depends(
-        get_db
+    service: PlannerDashboardService = Depends(
+        get_planner_dashboard_service,
     ),
 
     current_user=Depends(
@@ -43,9 +40,5 @@ def get_planner_dashboard(
     ),
 
 ):
-
-    service = PlannerDashboardService(
-        db
-    )
 
     return service.get_dashboard()

@@ -5,6 +5,7 @@ from sqlalchemy.orm import Session
 from app.repositories.deployment_optimization_repository import (
     DeploymentOptimizationRepository,
 )
+
 from app.schemas.deployment_optimization import (
     CapacityPlan,
     DeploymentOptimizationResponse,
@@ -13,25 +14,35 @@ from app.schemas.deployment_optimization import (
     LocationRecommendation,
 )
 
+from app.services.site_suitability_service import (
+    SiteSuitabilityService,
+)
+
+from app.services.renewable_recommendation_service import (
+    RenewableRecommendationService,
+)
+
 
 class DeploymentOptimizationService:
     """
     Deployment Optimization Engine.
 
-    Consumes outputs from:
+    Complete flow:
 
-        Prediction Engine
-        Resource Assessment Engine
-        GIS Engine
+        Site
+          ↓
+        SiteSuitabilityService
+          ↓
+        RenewableRecommendationService
+          ↓
+        DeploymentOptimizationService
+          ↓
+        Deployment plan
 
-    Produces:
+    This service does NOT ask the client to provide suitability
+    or renewable recommendation JSON.
 
-        Technology recommendation
-        Capacity plan
-        Location recommendation
-        Expansion recommendation
-
-    It does not perform ML prediction.
+    It consumes the existing intelligence services directly.
     """
 
     MINIMUM_DEPLOYMENT_SCORE = 50.0
@@ -42,20 +53,36 @@ class DeploymentOptimizationService:
     def __init__(
         self,
         db: Session,
-    ):
+        suitability_service: SiteSuitabilityService,
+        recommendation_service: RenewableRecommendationService,
+    ) -> None:
+
         self.repository = (
             DeploymentOptimizationRepository(db)
         )
 
+        self.suitability_service = (
+            suitability_service
+        )
+
+        self.recommendation_service = (
+            recommendation_service
+        )
+
     # =========================================================
-    # MAIN
+    # MAIN OPTIMIZATION
     # =========================================================
 
     def optimize_site(
         self,
         site_id: int,
-        intelligence: dict,
     ) -> DeploymentOptimizationResponse:
+        """
+        Generate deployment optimization for one site.
+
+        No suitability/recommendation payload is required
+        from the API client.
+        """
 
         site = self.repository.get_site(
             site_id
@@ -66,37 +93,91 @@ class DeploymentOptimizationService:
                 f"Site {site_id} not found."
             )
 
-        deployment_score = self._normalize(
-            intelligence.get(
-                "overall_deployment_score"
+        # =====================================================
+        # STEP 1
+        # Generate authoritative site suitability
+        # =====================================================
+
+        suitability = (
+            self.suitability_service.evaluate_site(
+                site_id=site_id,
             )
         )
 
-        technology = self._get_technology(
-            intelligence
+        suitability_data = (
+            suitability.model_dump()
+        )
+
+        # =====================================================
+        # STEP 2
+        # Generate renewable technology recommendation
+        # =====================================================
+
+        recommendation = (
+            self.recommendation_service.recommend(
+                site_id=site_id,
+                suitability_data=suitability_data,
+            )
+        )
+
+        recommendation_data = (
+            recommendation.model_dump()
+        )
+
+        # =====================================================
+        # STEP 3
+        # Extract canonical values
+        # =====================================================
+
+        deployment_score = self._normalize(
+            suitability_data.get(
+                "overall_score"
+            )
         )
 
         solar_score = self._normalize(
-            intelligence.get("solar_score")
+            suitability_data.get(
+                "solar_score"
+            )
         )
 
         wind_score = self._normalize(
-            intelligence.get("wind_score")
+            suitability_data.get(
+                "wind_score"
+            )
         )
 
-        hybrid_score = self._normalize(
-            intelligence.get("hybrid_score")
+        technology = self._extract_technology(
+            recommendation_data
         )
+
+        hybrid_score = self._extract_hybrid_score(
+            recommendation_data
+        )
+
+        # =====================================================
+        # STEP 4
+        # Deployment feasibility
+        # =====================================================
 
         recommended_location = (
-            deployment_score
-            >= self.MINIMUM_DEPLOYMENT_SCORE
+            suitability_data.get(
+                "deployment_feasible",
+                False,
+            )
+            and technology
+            != DeploymentTechnology.UNSUITABLE
         )
 
         hybrid_recommended = (
             technology
             == DeploymentTechnology.HYBRID
         )
+
+        # =====================================================
+        # STEP 5
+        # Capacity planning
+        # =====================================================
 
         capacity_plan = (
             self._calculate_capacity_plan(
@@ -107,6 +188,11 @@ class DeploymentOptimizationService:
             )
         )
 
+        # =====================================================
+        # STEP 6
+        # Location recommendation
+        # =====================================================
+
         location_recommendation = (
             self._build_location_recommendation(
                 site_id=site_id,
@@ -115,12 +201,22 @@ class DeploymentOptimizationService:
             )
         )
 
+        # =====================================================
+        # STEP 7
+        # Expansion planning
+        # =====================================================
+
         expansion_plan = (
             self._build_expansion_plan(
                 deployment_score=deployment_score,
                 technology=technology,
             )
         )
+
+        # =====================================================
+        # STEP 8
+        # Optimization reason
+        # =====================================================
 
         reason = (
             self._generate_optimization_reason(
@@ -131,15 +227,37 @@ class DeploymentOptimizationService:
             )
         )
 
+        # =====================================================
+        # FINAL RESPONSE
+        # =====================================================
+
         return DeploymentOptimizationResponse(
             site_id=site_id,
-            recommended_location=recommended_location,
+
+            recommended_location=(
+                recommended_location
+            ),
+
             technology=technology,
-            optimization_score=deployment_score,
+
+            optimization_score=(
+                deployment_score
+            ),
+
             capacity_plan=capacity_plan,
-            hybrid_recommended=hybrid_recommended,
-            location_recommendation=location_recommendation,
-            expansion_plan=expansion_plan,
+
+            hybrid_recommended=(
+                hybrid_recommended
+            ),
+
+            location_recommendation=(
+                location_recommendation
+            ),
+
+            expansion_plan=(
+                expansion_plan
+            ),
+
             optimization_reason=reason,
         )
 
@@ -148,21 +266,76 @@ class DeploymentOptimizationService:
     # =========================================================
 
     @staticmethod
-    def _get_technology(
-        intelligence: dict,
+    def _extract_technology(
+        recommendation: dict,
     ) -> DeploymentTechnology:
+        """
+        Extract technology from RenewableRecommendationService.
 
-        value = intelligence.get(
-            "recommended_technology"
+        Supports common response names such as:
+            technology
+            recommended_technology
+        """
+
+        value = recommendation.get(
+            "technology"
         )
+
+        if value is None:
+            value = recommendation.get(
+                "recommended_technology"
+            )
 
         if value is None:
             return DeploymentTechnology.UNSUITABLE
 
+        # Pydantic enum may already be represented as a string
+        if hasattr(value, "value"):
+            value = value.value
+
         try:
-            return DeploymentTechnology(value)
+            return DeploymentTechnology(
+                value
+            )
+
         except ValueError:
             return DeploymentTechnology.UNSUITABLE
+
+    # =========================================================
+    # HYBRID SCORE
+    # =========================================================
+
+    @staticmethod
+    def _extract_hybrid_score(
+        recommendation: dict,
+    ) -> float:
+
+        value = recommendation.get(
+            "hybrid_score"
+        )
+
+        if isinstance(value, dict):
+            value = value.get(
+                "score"
+            )
+
+        if value is None:
+            return 0.0
+
+        try:
+            return max(
+                0.0,
+                min(
+                    100.0,
+                    float(value),
+                ),
+            )
+
+        except (
+            TypeError,
+            ValueError,
+        ):
+            return 0.0
 
     # =========================================================
     # CAPACITY
@@ -175,106 +348,154 @@ class DeploymentOptimizationService:
         solar_score: float,
         wind_score: float,
     ) -> CapacityPlan:
+        """
+        Determine recommended capacity using the canonical
+        suitability and renewable recommendation outputs.
 
-        if technology == DeploymentTechnology.UNSUITABLE:
+        Capacity is deliberately kept as deployment business logic.
+        """
 
+        if (
+            technology
+            == DeploymentTechnology.UNSUITABLE
+        ):
             return CapacityPlan(
-                recommended_capacity_mw=0,
-                solar_capacity_mw=0,
-                wind_capacity_mw=0,
+                recommended_capacity_mw=0.0,
+                solar_capacity_mw=0.0,
+                wind_capacity_mw=0.0,
                 capacity_strategy=(
-                    "No deployment capacity recommended "
-                    "until site suitability improves."
+                    "No renewable capacity is recommended "
+                    "because the site is currently unsuitable."
                 ),
             )
 
-        multiplier = deployment_score / 100.0
+        # -----------------------------------------------------
+        # Single technology
+        # -----------------------------------------------------
 
         if technology == DeploymentTechnology.SOLAR:
 
-            capacity = self._round_capacity(
-                self.MAX_SINGLE_TECH_CAPACITY_MW
-                * multiplier
+            capacity = min(
+                deployment_score,
+                self.MAX_SINGLE_TECH_CAPACITY_MW,
             )
 
             return CapacityPlan(
-                recommended_capacity_mw=capacity,
-                solar_capacity_mw=capacity,
-                wind_capacity_mw=0,
+                recommended_capacity_mw=round(
+                    capacity,
+                    2,
+                ),
+                solar_capacity_mw=round(
+                    capacity,
+                    2,
+                ),
+                wind_capacity_mw=0.0,
                 capacity_strategy=(
                     "Prioritize solar capacity according "
-                    "to site suitability."
+                    "to the site's suitability score."
                 ),
             )
 
         if technology == DeploymentTechnology.WIND:
 
-            capacity = self._round_capacity(
-                self.MAX_SINGLE_TECH_CAPACITY_MW
-                * multiplier
+            capacity = min(
+                deployment_score,
+                self.MAX_SINGLE_TECH_CAPACITY_MW,
             )
 
             return CapacityPlan(
-                recommended_capacity_mw=capacity,
-                solar_capacity_mw=0,
-                wind_capacity_mw=capacity,
+                recommended_capacity_mw=round(
+                    capacity,
+                    2,
+                ),
+                solar_capacity_mw=0.0,
+                wind_capacity_mw=round(
+                    capacity,
+                    2,
+                ),
                 capacity_strategy=(
                     "Prioritize wind capacity according "
-                    "to site suitability."
+                    "to the site's suitability score."
                 ),
             )
 
-        total_capacity = (
-            self.MAX_HYBRID_CAPACITY_MW
-            * multiplier
-        )
+        # -----------------------------------------------------
+        # Hybrid
+        # -----------------------------------------------------
 
-        total_score = (
-            solar_score + wind_score
-        )
+        if technology == DeploymentTechnology.HYBRID:
 
-        if total_score > 0:
-            solar_ratio = (
-                solar_score / total_score
+            total_capacity = min(
+                deployment_score
+                * 1.5,
+                self.MAX_HYBRID_CAPACITY_MW,
             )
-        else:
-            solar_ratio = 0.5
 
-        solar_capacity = (
-            total_capacity
-            * solar_ratio
-        )
+            total_resource = (
+                solar_score
+                + wind_score
+            )
 
-        wind_capacity = (
-            total_capacity
-            * (1 - solar_ratio)
-        )
+            if total_resource <= 0:
+                solar_capacity = (
+                    total_capacity / 2
+                )
+                wind_capacity = (
+                    total_capacity / 2
+                )
+
+            else:
+                solar_ratio = (
+                    solar_score
+                    / total_resource
+                )
+
+                wind_ratio = (
+                    wind_score
+                    / total_resource
+                )
+
+                solar_capacity = (
+                    total_capacity
+                    * solar_ratio
+                )
+
+                wind_capacity = (
+                    total_capacity
+                    * wind_ratio
+                )
+
+            return CapacityPlan(
+                recommended_capacity_mw=round(
+                    total_capacity,
+                    2,
+                ),
+                solar_capacity_mw=round(
+                    solar_capacity,
+                    2,
+                ),
+                wind_capacity_mw=round(
+                    wind_capacity,
+                    2,
+                ),
+                capacity_strategy=(
+                    "Allocate hybrid capacity according "
+                    "to the relative solar and wind "
+                    "suitability scores."
+                ),
+            )
 
         return CapacityPlan(
-            recommended_capacity_mw=(
-                self._round_capacity(
-                    total_capacity
-                )
-            ),
-            solar_capacity_mw=(
-                self._round_capacity(
-                    solar_capacity
-                )
-            ),
-            wind_capacity_mw=(
-                self._round_capacity(
-                    wind_capacity
-                )
-            ),
+            recommended_capacity_mw=0.0,
+            solar_capacity_mw=0.0,
+            wind_capacity_mw=0.0,
             capacity_strategy=(
-                "Allocate capacity between solar "
-                "and wind according to their relative "
-                "resource suitability."
+                "No deployment capacity is recommended."
             ),
         )
 
     # =========================================================
-    # LOCATION
+    # LOCATION RECOMMENDATION
     # =========================================================
 
     @staticmethod
@@ -285,27 +506,33 @@ class DeploymentOptimizationService:
     ) -> LocationRecommendation:
 
         if deployment_score >= 85:
+
             reason = (
                 "Site has excellent deployment suitability "
-                "and should be prioritized."
+                "and is a strong candidate for renewable "
+                "energy deployment."
             )
 
         elif deployment_score >= 70:
+
             reason = (
                 "Site has high deployment suitability "
                 "and is a strong deployment candidate."
             )
 
         elif deployment_score >= 50:
+
             reason = (
                 "Site has moderate deployment suitability "
-                "and requires detailed feasibility validation."
+                "and may support deployment with "
+                "appropriate constraints."
             )
 
         else:
+
             reason = (
-                "Site does not currently meet the "
-                "recommended deployment threshold."
+                "Site does not currently meet the preferred "
+                "deployment suitability threshold."
             )
 
         return LocationRecommendation(
@@ -325,14 +552,16 @@ class DeploymentOptimizationService:
         technology: DeploymentTechnology,
     ) -> ExpansionPlan:
 
-        if technology == DeploymentTechnology.UNSUITABLE:
-
+        if (
+            technology
+            == DeploymentTechnology.UNSUITABLE
+        ):
             return ExpansionPlan(
                 expansion_recommended=False,
-                expansion_priority="None",
+                expansion_priority="Low",
                 expansion_reason=(
-                    "Expansion should not be considered "
-                    "until the site becomes suitable."
+                    "Expansion is not recommended because "
+                    "the site is currently unsuitable."
                 ),
             )
 
@@ -353,8 +582,19 @@ class DeploymentOptimizationService:
                 expansion_recommended=True,
                 expansion_priority="Medium",
                 expansion_reason=(
-                    "Site conditions may support future "
-                    "capacity expansion after initial deployment."
+                    "Strong site suitability may support "
+                    "future capacity expansion."
+                ),
+            )
+
+        if deployment_score >= 50:
+
+            return ExpansionPlan(
+                expansion_recommended=True,
+                expansion_priority="Low",
+                expansion_reason=(
+                    "Limited expansion may be considered "
+                    "after evaluating the initial deployment."
                 ),
             )
 
@@ -362,13 +602,14 @@ class DeploymentOptimizationService:
             expansion_recommended=False,
             expansion_priority="Low",
             expansion_reason=(
-                "Additional feasibility validation is "
-                "recommended before planning expansion."
+                "Expansion is not recommended because "
+                "site suitability is below the deployment "
+                "threshold."
             ),
         )
 
     # =========================================================
-    # EXPLANATION
+    # OPTIMIZATION REASON
     # =========================================================
 
     @staticmethod
@@ -379,23 +620,10 @@ class DeploymentOptimizationService:
         capacity_plan: CapacityPlan,
     ) -> str:
 
-        if technology == DeploymentTechnology.UNSUITABLE:
-            return (
-                "No deployment is recommended because "
-                "the site does not currently satisfy "
-                "the deployment suitability threshold."
-            )
-
-        if technology == DeploymentTechnology.HYBRID:
-            return (
-                "Hybrid solar-wind deployment is recommended "
-                "because both technologies demonstrate suitable "
-                "resource potential. "
-                f"Recommended combined capacity: "
-                f"{capacity_plan.recommended_capacity_mw} MW."
-            )
-
-        if technology == DeploymentTechnology.SOLAR:
+        if (
+            technology
+            == DeploymentTechnology.SOLAR
+        ):
             return (
                 "Solar deployment is prioritized based "
                 "on the site's renewable suitability. "
@@ -403,15 +631,37 @@ class DeploymentOptimizationService:
                 f"{capacity_plan.solar_capacity_mw} MW."
             )
 
+        if (
+            technology
+            == DeploymentTechnology.WIND
+        ):
+            return (
+                "Wind deployment is prioritized based "
+                "on the site's renewable suitability. "
+                f"Recommended wind capacity: "
+                f"{capacity_plan.wind_capacity_mw} MW."
+            )
+
+        if (
+            technology
+            == DeploymentTechnology.HYBRID
+        ):
+            return (
+                "Hybrid solar-wind deployment is "
+                "recommended based on complementary "
+                "renewable resource suitability. "
+                f"Recommended total capacity: "
+                f"{capacity_plan.recommended_capacity_mw} MW."
+            )
+
         return (
-            "Wind deployment is prioritized based "
-            "on the site's renewable suitability. "
-            f"Recommended wind capacity: "
-            f"{capacity_plan.wind_capacity_mw} MW."
+            "Deployment is not recommended because "
+            "the site does not currently meet the "
+            "required renewable suitability criteria."
         )
 
     # =========================================================
-    # HELPERS
+    # NORMALIZATION
     # =========================================================
 
     @staticmethod
@@ -424,6 +674,7 @@ class DeploymentOptimizationService:
 
         try:
             value = float(value)
+
         except (
             TypeError,
             ValueError,
@@ -438,15 +689,5 @@ class DeploymentOptimizationService:
                     value,
                 ),
             ),
-            2,
-        )
-
-    @staticmethod
-    def _round_capacity(
-        capacity: float,
-    ) -> float:
-
-        return round(
-            max(0.0, capacity),
             2,
         )

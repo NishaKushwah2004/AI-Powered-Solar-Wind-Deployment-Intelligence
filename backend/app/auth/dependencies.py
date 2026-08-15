@@ -8,37 +8,36 @@ from app.models.user import User
 from app.repositories.user_repository import UserRepository
 
 
-credentials_exception = HTTPException(
-    status_code=status.HTTP_401_UNAUTHORIZED,
-    detail="Could not validate authentication credentials.",
-    headers={"WWW-Authenticate": "Bearer"},
-)
-
-
 def get_current_user(
     token: str = Depends(oauth2_scheme),
     db: Session = Depends(get_db),
 ) -> User:
     """
-    Retrieve the currently authenticated user from the JWT.
+    Get the currently authenticated active user.
     """
 
     payload = decode_access_token(token)
 
-    user_id = payload.get("sub")
+    subject = payload.get("sub")
 
-    if user_id is None:
-        raise credentials_exception
+    if subject is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid authentication token.",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
 
     try:
-        user_id = int(user_id)
-
+        user_id = int(subject)
     except (TypeError, ValueError) as exc:
-        raise credentials_exception from exc
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid authentication token.",
+            headers={"WWW-Authenticate": "Bearer"},
+        ) from exc
 
-    repository = UserRepository(db)
-
-    user = repository.get_by_id(user_id)
+    user_repository = UserRepository(db)
+    user = user_repository.get_by_id(user_id)
 
     if user is None:
         raise HTTPException(

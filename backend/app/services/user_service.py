@@ -1,13 +1,12 @@
 from fastapi import HTTPException, status
 
-from app.auth.hashing import hash_password
+from app.auth.hashing import hash_password, verify_password
+from app.auth.jwt_handler import create_access_token
 from app.models.user import User
+from app.repositories.role_repository import RoleRepository
 from app.repositories.user_repository import UserRepository
 from app.schemas.user import UserCreate, UserProfileUpdate
 from app.services.base_service import BaseService
-from app.repositories.role_repository import RoleRepository
-from app.auth.hashing import verify_password
-from app.auth.jwt_handler import create_access_token
 
 
 class UserService(BaseService[UserRepository]):
@@ -51,7 +50,7 @@ class UserService(BaseService[UserRepository]):
         )
 
         return self.repository.create(user)
-    
+
     def authenticate_user(
         self,
         email: str,
@@ -79,7 +78,6 @@ class UserService(BaseService[UserRepository]):
                 "sub": str(user.id),
                 "email": user.email,
                 "role": user.role.name,
-                "type": "access",
             }
         )
 
@@ -87,7 +85,7 @@ class UserService(BaseService[UserRepository]):
             "access_token": access_token,
             "token_type": "bearer",
         }
-    
+
     def update_profile(
         self,
         current_user: User,

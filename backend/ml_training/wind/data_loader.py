@@ -1,5 +1,5 @@
 """
-Wind dataset loading and preparation.
+Wind observed dataset loader.
 """
 
 from __future__ import annotations
@@ -23,25 +23,27 @@ from ml_training.wind.config import (
 )
 
 
-def load_wind_dataset(
+def load_wind_observed_data(
     path: str | Path = DATASET_PATH,
 ) -> pd.DataFrame:
-    """
-    Load and validate the Wind dataset.
-    """
 
     path = Path(path)
 
     if not path.exists():
         raise FileNotFoundError(
-            f"Wind dataset not found: {path}"
+            f"Wind observed dataset not found: {path}"
+        )
+
+    if path.suffix.lower() != ".csv":
+        raise ValueError(
+            "Wind observed dataset must be a CSV file."
         )
 
     dataframe = pd.read_csv(path)
 
     if dataframe.empty:
         raise ValueError(
-            "Wind dataset is empty."
+            "Wind observed dataset is empty."
         )
 
     validate_dataset(
@@ -55,9 +57,6 @@ def load_wind_dataset(
 def prepare_wind_training_data(
     dataframe: pd.DataFrame,
 ) -> tuple[pd.DataFrame, pd.Series]:
-    """
-    Prepare Wind features and target.
-    """
 
     X, y = prepare_training_data(
         dataframe,
@@ -66,12 +65,11 @@ def prepare_wind_training_data(
 
     if list(X.columns) != FEATURES:
         raise ValueError(
-            "Wind feature order does not match "
+            "Wind feature ordering does not match "
             "the authoritative feature contract."
         )
 
-    if y.name != TARGET:
-        y.name = TARGET
+    y.name = TARGET
 
     return X, y
 
@@ -79,12 +77,11 @@ def prepare_wind_training_data(
 def get_dataset_summary(
     dataframe: pd.DataFrame,
 ) -> dict:
-    """
-    Return basic Wind dataset information.
-    """
 
     return {
-        "rows": len(dataframe),
+        "data_source": "observed",
+        "dataset_type": "observed",
+        "rows": int(len(dataframe)),
         "features": len(FEATURES),
         "feature_names": FEATURES.copy(),
         "target": TARGET,

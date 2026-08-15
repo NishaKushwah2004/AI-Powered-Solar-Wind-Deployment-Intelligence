@@ -1,9 +1,8 @@
 """
-Wind model inference.
+Wind ML inference.
 
-Run:
-
-    python -m ml_training.wind.predict
+Uses trained artifacts produced exclusively
+from observed data.
 """
 
 from __future__ import annotations
@@ -21,7 +20,9 @@ from ml_training.wind.config import (
 
 
 def load_artifacts():
-    """Load trained Wind model and preprocessor."""
+    """
+    Load the trained Wind ML artifacts.
+    """
 
     if not MODEL_PATH.exists():
         raise FileNotFoundError(
@@ -30,7 +31,7 @@ def load_artifacts():
 
     if not PREPROCESSOR_PATH.exists():
         raise FileNotFoundError(
-            f"Wind preprocessor not found: "
+            "Wind preprocessor not found: "
             f"{PREPROCESSOR_PATH}"
         )
 
@@ -49,7 +50,11 @@ def predict_wind(
     record: dict,
 ) -> float:
     """
-    Generate Wind power prediction in MW.
+    Generate Wind prediction using
+    the trained observed-data model.
+
+    No heuristic calculation.
+    No synthetic fallback.
     """
 
     model, preprocessor = load_artifacts()
@@ -73,14 +78,14 @@ def predict_wind(
 if __name__ == "__main__":
 
     sample = {
-        "latitude": 13.34,
-        "longitude": 77.10,
+        "latitude": 23.25,
+        "longitude": 79.95,
         "wind_speed_m_s": 7.5,
         "air_density_kg_m3": 1.18,
         "temperature_c": 26.0,
         "humidity_pct": 55.0,
-        "pressure_hpa": 1008.0,
-        "elevation_m": 890.0,
+        "pressure_hpa": 950.0,
+        "elevation_m": 400.0,
     }
 
     prediction = predict_wind(
@@ -88,6 +93,6 @@ if __name__ == "__main__":
     )
 
     print(
-        f"Predicted Wind Generation: "
+        "Predicted Wind Generation: "
         f"{prediction:.4f} MW"
     )

@@ -3,11 +3,13 @@ from fastapi import (
     Depends,
 )
 
-from sqlalchemy.orm import Session
+from app.api.deps import (
+    get_project_manager_dashboard_service,
+)
 
-from app.api.deps import get_db
-
-from app.auth.permissions import require_roles
+from app.auth.permissions import (
+    require_roles,
+)
 
 from app.schemas.project_manager_dashboard import (
     ProjectManagerDashboardResponse,
@@ -30,8 +32,8 @@ router = APIRouter(
 )
 def get_project_manager_dashboard(
 
-    db: Session = Depends(
-        get_db
+    service: ProjectManagerDashboardService = Depends(
+        get_project_manager_dashboard_service,
     ),
 
     current_user=Depends(
@@ -40,13 +42,6 @@ def get_project_manager_dashboard(
             "Admin",
         )
     ),
-
 ):
-
-    service = (
-        ProjectManagerDashboardService(
-            db
-        )
-    )
 
     return service.get_dashboard()

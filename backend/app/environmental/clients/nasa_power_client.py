@@ -26,8 +26,15 @@ class NASAPowerClient:
     """
     Client for NASA POWER API.
 
-    Retrieves long-term climatology
-    and solar resource information.
+    Responsibility:
+        Retrieve raw long-term solar resource data
+        for a latitude/longitude.
+
+    This client does NOT:
+        - calculate suitability
+        - calculate scores
+        - make deployment recommendations
+        - perform ML prediction
     """
 
     def get_solar_resource(
@@ -43,13 +50,10 @@ class NASAPowerClient:
         )
 
         try:
-
             response = requests.get(
                 f"{NASA_POWER_API_URL}{NASA_POWER_ENDPOINT}",
                 params={
-                    "parameters": ",".join(
-                        NASA_PARAMETERS
-                    ),
+                    "parameters": ",".join(NASA_PARAMETERS),
                     "community": NASA_COMMUNITY,
                     "latitude": latitude,
                     "longitude": longitude,
@@ -67,35 +71,55 @@ class NASAPowerClient:
                 .get("parameter", {})
             )
 
+            if not parameters:
+                raise NASAPowerServiceError(
+                    "NASA POWER returned no parameter data."
+                )
+
             ghi = parameters.get(
-                "ALLSKY_SFC_SW_DWN", {}
+                "ALLSKY_SFC_SW_DWN",
+                {},
             )
 
             dni = parameters.get(
-                "ALLSKY_SFC_SW_DNI", {}
+                "ALLSKY_SFC_SW_DNI",
+                {},
             )
 
             dhi = parameters.get(
-                "ALLSKY_SFC_SW_DIFF", {}
+                "ALLSKY_SFC_SW_DIFF",
+                {},
             )
 
-            ghi_value = (
-                sum(ghi.values()) / len(ghi)
-                if ghi
-                else None
-            )
+            def calculate_mean(
+                values: dict,
+            ) -> float | None:
 
-            dni_value = (
-                sum(dni.values()) / len(dni)
-                if dni
-                else None
-            )
+                numeric_values = [
+                    float(value)
+                    for value in values.values()
+                    if value is not None
+                ]
 
-            dhi_value = (
-                sum(dhi.values()) / len(dhi)
-                if dhi
-                else None
-            )
+                if not numeric_values:
+                    return None
+
+                return sum(numeric_values) / len(
+                    numeric_values
+                )
+
+            ghi_value = calculate_mean(ghi)
+            dni_value = calculate_mean(dni)
+            dhi_value = calculate_mean(dhi)
+
+            if (
+                ghi_value is None
+                and dni_value is None
+                and dhi_value is None
+            ):
+                raise NASAPowerServiceError(
+                    "NASA POWER returned no usable solar resource data."
+                )
 
             return SolarResult(
                 ghi=ghi_value,
@@ -103,6 +127,9 @@ class NASAPowerClient:
                 dhi=dhi_value,
                 solar_irradiance=ghi_value,
             )
+
+        except NASAPowerServiceError:
+            raise
 
         except requests.Timeout as exc:
 
@@ -122,4 +149,14 @@ class NASAPowerClient:
 
             raise NASAPowerServiceError(
                 f"NASA POWER request failed: {exc}"
+            ) from exc
+
+        except (ValueError, TypeError) as exc:
+
+            logger.exception(
+                "Invalid NASA POWER response."
+            )
+
+            raise NASAPowerServiceError(
+                "NASA POWER returned invalid data."
             ) from exc

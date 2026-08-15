@@ -41,3 +41,10 @@ class GISProviderTimeoutError(GISException):
     """
 
     pass
+
+class GISException(Exception):
+    """Base exception for GIS services."""
+
+
+class SentinelServiceError(GISException):
+    """Raised when Sentinel Hub service fails."""

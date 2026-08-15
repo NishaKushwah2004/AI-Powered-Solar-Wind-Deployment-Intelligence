@@ -13,10 +13,18 @@ from app.schemas.project import (
 )
 from app.services.project_service import ProjectService
 
+
 router = APIRouter(
     prefix="/projects",
     tags=["Projects"],
 )
+
+
+def get_project_service(db: Session) -> ProjectService:
+    return ProjectService(
+        ProjectRepository(db)
+    )
+
 
 @router.post(
     "",
@@ -32,14 +40,13 @@ def create_project(
         )
     ),
 ):
-    repository = ProjectRepository(db)
-
-    service = ProjectService(repository)
+    service = get_project_service(db)
 
     return service.create_project(
         project_data,
         current_user,
     )
+
 
 @router.get(
     "",
@@ -49,11 +56,12 @@ def get_projects(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    repository = ProjectRepository(db)
+    service = get_project_service(db)
 
-    service = ProjectService(repository)
+    return service.get_all_projects(
+        current_user
+    )
 
-    return service.get_all_projects()
 
 @router.get(
     "/{project_id}",
@@ -64,11 +72,13 @@ def get_project(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    repository = ProjectRepository(db)
+    service = get_project_service(db)
 
-    service = ProjectService(repository)
+    return service.get_project_by_id(
+        project_id,
+        current_user,
+    )
 
-    return service.get_project_by_id(project_id)
 
 @router.put(
     "/{project_id}",
@@ -85,14 +95,14 @@ def update_project(
         )
     ),
 ):
-    repository = ProjectRepository(db)
-
-    service = ProjectService(repository)
+    service = get_project_service(db)
 
     return service.update_project(
         project_id,
         project_data,
+        current_user,
     )
+
 
 @router.delete("/{project_id}")
 def delete_project(
@@ -102,8 +112,9 @@ def delete_project(
         require_roles("Admin")
     ),
 ):
-    repository = ProjectRepository(db)
+    service = get_project_service(db)
 
-    service = ProjectService(repository)
-
-    return service.delete_project(project_id)
+    return service.delete_project(
+        project_id,
+        current_user,
+    )

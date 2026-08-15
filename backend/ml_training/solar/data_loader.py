@@ -1,5 +1,5 @@
 """
-Solar dataset loading and preparation.
+Solar observed dataset loader.
 """
 
 from __future__ import annotations
@@ -11,9 +11,11 @@ import pandas as pd
 from ml_core.preprocessing.feature_preparation import (
     prepare_training_data,
 )
+
 from ml_training.common.validation import (
     validate_dataset,
 )
+
 from ml_training.solar.config import (
     DATASET_PATH,
     FEATURES,
@@ -21,25 +23,30 @@ from ml_training.solar.config import (
 )
 
 
-def load_solar_dataset(
+def load_solar_observed_data(
     path: str | Path = DATASET_PATH,
 ) -> pd.DataFrame:
     """
-    Load and validate the Solar dataset.
+    Load and validate the Solar observed dataset.
     """
 
     path = Path(path)
 
     if not path.exists():
         raise FileNotFoundError(
-            f"Solar dataset not found: {path}"
+            f"Solar observed dataset not found: {path}"
+        )
+
+    if path.suffix.lower() != ".csv":
+        raise ValueError(
+            "Solar observed dataset must be a CSV file."
         )
 
     dataframe = pd.read_csv(path)
 
     if dataframe.empty:
         raise ValueError(
-            "Solar dataset is empty."
+            "Solar observed dataset is empty."
         )
 
     validate_dataset(
@@ -53,9 +60,6 @@ def load_solar_dataset(
 def prepare_solar_training_data(
     dataframe: pd.DataFrame,
 ) -> tuple[pd.DataFrame, pd.Series]:
-    """
-    Prepare Solar features and target.
-    """
 
     X, y = prepare_training_data(
         dataframe,
@@ -64,12 +68,11 @@ def prepare_solar_training_data(
 
     if list(X.columns) != FEATURES:
         raise ValueError(
-            "Solar feature order does not match "
+            "Solar feature ordering does not match "
             "the authoritative feature contract."
         )
 
-    if y.name != TARGET:
-        y.name = TARGET
+    y.name = TARGET
 
     return X, y
 
@@ -77,12 +80,11 @@ def prepare_solar_training_data(
 def get_dataset_summary(
     dataframe: pd.DataFrame,
 ) -> dict:
-    """
-    Return basic Solar dataset information.
-    """
 
     return {
-        "rows": len(dataframe),
+        "data_source": "observed",
+        "dataset_type": "observed",
+        "rows": int(len(dataframe)),
         "features": len(FEATURES),
         "feature_names": FEATURES.copy(),
         "target": TARGET,

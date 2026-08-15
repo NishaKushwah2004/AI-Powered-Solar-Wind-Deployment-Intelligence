@@ -4,9 +4,10 @@ from fastapi import (
     HTTPException,
     status,
 )
-from sqlalchemy.orm import Session
 
-from app.api.deps import get_db
+from app.api.deps import (
+    get_investment_recommendation_service,
+)
 
 from app.auth.permissions import require_roles
 
@@ -31,8 +32,11 @@ router = APIRouter(
 )
 def evaluate_site_investment(
     site_id: int,
-    intelligence: dict,
-    db: Session = Depends(get_db),
+
+    service: InvestmentRecommendationService = Depends(
+        get_investment_recommendation_service,
+    ),
+
     current_user=Depends(
         require_roles(
             "Renewable Energy Planner",
@@ -42,13 +46,10 @@ def evaluate_site_investment(
     ),
 ):
 
-    service = InvestmentRecommendationService(db)
-
     try:
 
         return service.evaluate_investment(
             site_id=site_id,
-            intelligence=intelligence,
         )
 
     except ValueError as exc:

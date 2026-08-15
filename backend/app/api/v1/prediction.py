@@ -1,9 +1,16 @@
 from fastapi import APIRouter, Depends
 
-from app.api.deps import get_prediction_service
+from app.api.deps import (
+    get_prediction_service,
+    get_renewable_intelligence_service,
+)
 
 from app.prediction.services.prediction_service import (
     PredictionService,
+)
+
+from app.services.renewable_intelligence_service import (
+    RenewableIntelligenceService,
 )
 
 from app.schemas.ml_prediction import (
@@ -24,9 +31,9 @@ router = APIRouter(
 )
 
 
-# ---------------------------------------------------------------------
-# Solar Prediction
-# ---------------------------------------------------------------------
+# =========================================================
+# DIRECT SOLAR ML PREDICTION
+# =========================================================
 
 @router.post(
     "/solar",
@@ -44,9 +51,9 @@ def predict_solar(
     )
 
 
-# ---------------------------------------------------------------------
-# Wind Prediction
-# ---------------------------------------------------------------------
+# =========================================================
+# DIRECT WIND ML PREDICTION
+# =========================================================
 
 @router.post(
     "/wind",
@@ -64,9 +71,18 @@ def predict_wind(
     )
 
 
-# ---------------------------------------------------------------------
-# Unified Renewable Prediction
-# ---------------------------------------------------------------------
+# =========================================================
+# DIRECT UNIFIED ML PREDICTION
+# =========================================================
+#
+# This endpoint is useful for:
+# - testing
+# - debugging
+# - ML validation
+# - automated tests
+#
+# It requires explicit feature values.
+# =========================================================
 
 @router.post(
     "/renewable",
@@ -81,4 +97,47 @@ def predict_renewable(
 
     return prediction_service.predict_renewable(
         data,
+    )
+
+
+# =========================================================
+# SITE-BASED RENEWABLE INTELLIGENCE
+# =========================================================
+#
+# THIS is the endpoint your frontend should primarily use.
+#
+# Request:
+#
+#     POST /prediction/site/1
+#
+# The backend automatically:
+#
+#     Site
+#       ↓
+#     EnvironmentalService
+#       ↓
+#     Weather + NASA
+#       ↓
+#     GIS
+#       ↓
+#     FeatureBuilder
+#       ↓
+#     Solar ML + Wind ML
+#       ↓
+#     Hybrid prediction
+#
+# No ML parameters are required from the frontend.
+# =========================================================
+
+@router.post(
+    "/site/{site_id}",
+)
+def predict_site(
+    site_id: int,
+    intelligence_service: RenewableIntelligenceService = Depends(
+        get_renewable_intelligence_service,
+    ),
+):
+    return intelligence_service.analyze_site(
+        site_id,
     )

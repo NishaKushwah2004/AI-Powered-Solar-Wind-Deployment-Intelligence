@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from sqlalchemy.orm import Session
 
 from app.repositories.renewable_recommendation_repository import (
@@ -14,39 +16,83 @@ from app.schemas.renewable_recommendation import (
 
 class RenewableRecommendationService:
     """
-    Renewable Energy Recommendation Logic.
+    Renewable Energy Recommendation Engine.
 
-    Determines whether a site is better suited for:
+    Responsibility
+    --------------
+    Determines the most appropriate renewable technology
+    for a site:
 
         - Solar
         - Wind
         - Hybrid Solar-Wind
         - Unsuitable
 
-    The service consumes already-generated intelligence rather
-    than recalculating prediction or GIS values.
+    The service does NOT:
+        - perform ML prediction
+        - fetch NASA data
+        - fetch weather data
+        - perform GIS calculations
+        - recalculate site suitability
+
+    It consumes the already-generated Site Suitability result.
+
+    Flow:
+
+        Environmental + GIS
+                ↓
+        Solar/Wind ML Prediction
+                ↓
+        Site Suitability
+                ↓
+        Renewable Recommendation
     """
 
-    MINIMUM_DEPLOYMENT_SCORE = 30
+    # ---------------------------------------------------------
+    # Business thresholds
+    # ---------------------------------------------------------
 
-    SOLAR_THRESHOLD = 65
-    WIND_THRESHOLD = 65
-    HYBRID_THRESHOLD = 65
+    MINIMUM_DEPLOYMENT_SCORE = 30.0
 
-    def __init__(self, db: Session):
+    SOLAR_THRESHOLD = 65.0
+    WIND_THRESHOLD = 65.0
+    HYBRID_THRESHOLD = 60.0
+
+    def __init__(self, db: Session) -> None:
+
         self.repository = (
             RenewableRecommendationRepository(db)
         )
 
     # =========================================================
-    # Main recommendation method
+    # MAIN RECOMMENDATION
     # =========================================================
 
     def recommend(
         self,
         site_id: int,
-        intelligence: dict,
+        suitability_data: dict,
     ) -> RenewableRecommendationResponse:
+        """
+        Generate renewable technology recommendation
+        using the existing site suitability result.
+
+        Expected suitability_data:
+
+        {
+            "site_id": 1,
+            "overall_score": 75,
+            "deployment_feasible": true,
+            "solar_score": ...,
+            "wind_score": ...,
+            "renewable_resource": {...},
+            "geographic_suitability": {...},
+            "infrastructure_accessibility": {...},
+            "environmental_impact": {...},
+            "economic_feasibility": {...},
+            ...
+        }
+        """
 
         site = self.repository.get_site(site_id)
 
@@ -55,51 +101,84 @@ class RenewableRecommendationService:
                 f"Site {site_id} not found."
             )
 
-        solar_resource = self._normalize(
-            intelligence.get("solar_score")
-        )
-
-        wind_resource = self._normalize(
-            intelligence.get("wind_score")
-        )
+        # -----------------------------------------------------
+        # Overall suitability
+        # -----------------------------------------------------
 
         overall_site_score = self._normalize(
-            intelligence.get(
-                "overall_deployment_score"
+            suitability_data.get("overall_score")
+        )
+
+        deployment_feasible = bool(
+            suitability_data.get(
+                "deployment_feasible",
+                overall_site_score
+                >= self.MINIMUM_DEPLOYMENT_SCORE,
             )
         )
 
+        # -----------------------------------------------------
+        # Resource / technology scores
+        # -----------------------------------------------------
+
+        solar_resource = self._extract_score(
+            suitability_data,
+            "solar_score",
+        )
+
+        wind_resource = self._extract_score(
+            suitability_data,
+            "wind_score",
+        )
+
+        # -----------------------------------------------------
+        # Technology-specific suitability
+        #
+        # If the suitability engine does not currently expose
+        # separate solar/wind suitability scores, use the
+        # corresponding renewable resource score.
+        # -----------------------------------------------------
+
         solar_suitability = self._extract_score(
-            intelligence,
+            suitability_data,
             "solar_suitability_score",
-            solar_resource,
+            fallback=solar_resource,
         )
 
         wind_suitability = self._extract_score(
-            intelligence,
+            suitability_data,
             "wind_suitability_score",
-            wind_resource,
+            fallback=wind_resource,
         )
 
-        deployment_feasible = (
-            overall_site_score
-            >= self.MINIMUM_DEPLOYMENT_SCORE
+        # -----------------------------------------------------
+        # Calculate technology scores
+        # -----------------------------------------------------
+
+        solar_score = (
+            self._calculate_technology_score(
+                solar_resource,
+                solar_suitability,
+            )
         )
 
-        solar_score = self._calculate_technology_score(
-            solar_resource,
-            solar_suitability,
+        wind_score = (
+            self._calculate_technology_score(
+                wind_resource,
+                wind_suitability,
+            )
         )
 
-        wind_score = self._calculate_technology_score(
-            wind_resource,
-            wind_suitability,
+        hybrid_score = (
+            self._calculate_hybrid_score(
+                solar_score,
+                wind_score,
+            )
         )
 
-        hybrid_score = self._calculate_hybrid_score(
-            solar_score,
-            wind_score,
-        )
+        # -----------------------------------------------------
+        # Select technology
+        # -----------------------------------------------------
 
         if not deployment_feasible:
 
@@ -110,43 +189,62 @@ class RenewableRecommendationService:
         else:
 
             technology = self._select_technology(
-                solar_score,
-                wind_score,
-                hybrid_score,
+                solar_score=solar_score,
+                wind_score=wind_score,
+                hybrid_score=hybrid_score,
             )
 
-        confidence = self._calculate_confidence(
-            technology=technology,
+        # -----------------------------------------------------
+        # Confidence
+        # -----------------------------------------------------
+
+        confidence = (
+            self._calculate_confidence(
+                technology=technology,
+                solar_score=solar_score,
+                wind_score=wind_score,
+                overall_site_score=overall_site_score,
+            )
+        )
+
+        # -----------------------------------------------------
+        # Strengths / constraints
+        # -----------------------------------------------------
+
+        strengths = self._identify_strengths(
             solar_score=solar_score,
             wind_score=wind_score,
             overall_site_score=overall_site_score,
         )
 
-        strengths = self._identify_strengths(
-            solar_score,
-            wind_score,
-            overall_site_score,
-        )
-
         constraints = self._identify_constraints(
-            solar_score,
-            wind_score,
-            overall_site_score,
-        )
-
-        reason = self._generate_reason(
-            technology=technology,
             solar_score=solar_score,
             wind_score=wind_score,
-            hybrid_score=hybrid_score,
-            constraints=constraints,
+            overall_site_score=overall_site_score,
         )
 
-        capacity_type = (
+        # -----------------------------------------------------
+        # Recommendation explanation
+        # -----------------------------------------------------
+
+        recommendation_reason = (
+            self._generate_reason(
+                technology=technology,
+                solar_score=solar_score,
+                wind_score=wind_score,
+                hybrid_score=hybrid_score,
+            )
+        )
+
+        recommended_capacity_type = (
             self._get_capacity_type(
                 technology
             )
         )
+
+        # -----------------------------------------------------
+        # Response
+        # -----------------------------------------------------
 
         return RenewableRecommendationResponse(
             site_id=site_id,
@@ -173,17 +271,19 @@ class RenewableRecommendationService:
 
             deployment_feasible=deployment_feasible,
 
-            recommendation_reason=reason,
+            recommendation_reason=recommendation_reason,
 
             strengths=strengths,
 
             constraints=constraints,
 
-            recommended_capacity_type=capacity_type,
+            recommended_capacity_type=(
+                recommended_capacity_type
+            ),
         )
 
     # =========================================================
-    # Technology score
+    # TECHNOLOGY SCORE
     # =========================================================
 
     @staticmethod
@@ -192,22 +292,32 @@ class RenewableRecommendationService:
         suitability_score: float,
     ) -> float:
         """
-        Combine renewable resource availability and
-        technology-specific site suitability.
+        Combine resource and technology suitability.
 
-        This does not replace the existing prediction model.
+        Business rule:
+
+            Resource       = 60%
+            Suitability    = 40%
         """
 
+        score = (
+            resource_score * 0.60
+            + suitability_score * 0.40
+        )
+
         return round(
-            (
-                resource_score * 0.60
-                + suitability_score * 0.40
+            max(
+                0.0,
+                min(
+                    100.0,
+                    score,
+                ),
             ),
             2,
         )
 
     # =========================================================
-    # Hybrid score
+    # HYBRID SCORE
     # =========================================================
 
     @staticmethod
@@ -221,10 +331,13 @@ class RenewableRecommendationService:
 
         average_score = (
             solar_score + wind_score
-        ) / 2
+        ) / 2.0
 
-        balance = 100 - abs(
-            solar_score - wind_score
+        balance = (
+            100.0
+            - abs(
+                solar_score - wind_score
+            )
         )
 
         hybrid_score = (
@@ -234,9 +347,9 @@ class RenewableRecommendationService:
 
         return round(
             max(
-                0,
+                0.0,
                 min(
-                    100,
+                    100.0,
                     hybrid_score,
                 ),
             ),
@@ -244,7 +357,7 @@ class RenewableRecommendationService:
         )
 
     # =========================================================
-    # Technology selection
+    # TECHNOLOGY SELECTION
     # =========================================================
 
     def _select_technology(
@@ -255,18 +368,24 @@ class RenewableRecommendationService:
     ) -> RenewableTechnology:
 
         solar_available = (
-            solar_score >= self.SOLAR_THRESHOLD
+            solar_score
+            >= self.SOLAR_THRESHOLD
         )
 
         wind_available = (
-            wind_score >= self.WIND_THRESHOLD
+            wind_score
+            >= self.WIND_THRESHOLD
         )
 
         hybrid_available = (
-            hybrid_score >= self.HYBRID_THRESHOLD
+            hybrid_score
+            >= self.HYBRID_THRESHOLD
         )
 
-        # Both technologies perform strongly.
+        # -----------------------------------------------------
+        # Both technologies are strong
+        # -----------------------------------------------------
+
         if (
             solar_available
             and wind_available
@@ -274,24 +393,37 @@ class RenewableRecommendationService:
         ):
             return RenewableTechnology.HYBRID
 
-        # Solar is clearly stronger.
-        if solar_available and (
-            solar_score > wind_score
+        # -----------------------------------------------------
+        # Solar clearly stronger
+        # -----------------------------------------------------
+
+        if (
+            solar_available
+            and solar_score > wind_score
         ):
             return RenewableTechnology.SOLAR
 
-        # Wind is clearly stronger.
-        if wind_available and (
-            wind_score > solar_score
+        # -----------------------------------------------------
+        # Wind clearly stronger
+        # -----------------------------------------------------
+
+        if (
+            wind_available
+            and wind_score > solar_score
         ):
             return RenewableTechnology.WIND
 
-        # Hybrid is useful when both technologies
-        # have meaningful potential.
+        # -----------------------------------------------------
+        # Both have moderate potential
+        # -----------------------------------------------------
+
         if hybrid_available:
             return RenewableTechnology.HYBRID
 
-        # One technology may still be usable.
+        # -----------------------------------------------------
+        # One technology is usable
+        # -----------------------------------------------------
+
         if solar_available:
             return RenewableTechnology.SOLAR
 
@@ -301,7 +433,7 @@ class RenewableRecommendationService:
         return RenewableTechnology.UNSUITABLE
 
     # =========================================================
-    # Confidence
+    # CONFIDENCE
     # =========================================================
 
     @staticmethod
@@ -312,7 +444,10 @@ class RenewableRecommendationService:
         overall_site_score: float,
     ) -> RecommendationConfidence:
 
-        if technology == RenewableTechnology.UNSUITABLE:
+        if (
+            technology
+            == RenewableTechnology.UNSUITABLE
+        ):
             return RecommendationConfidence.HIGH
 
         if technology == RenewableTechnology.SOLAR:
@@ -335,7 +470,10 @@ class RenewableRecommendationService:
 
             return RecommendationConfidence.LOW
 
+        # -----------------------------------------------------
         # Hybrid
+        # -----------------------------------------------------
+
         if (
             solar_score >= 75
             and wind_score >= 75
@@ -352,7 +490,7 @@ class RenewableRecommendationService:
         return RecommendationConfidence.LOW
 
     # =========================================================
-    # Strengths
+    # STRENGTHS
     # =========================================================
 
     @staticmethod
@@ -362,7 +500,7 @@ class RenewableRecommendationService:
         overall_site_score: float,
     ) -> list[str]:
 
-        strengths = []
+        strengths: list[str] = []
 
         if solar_score >= 75:
             strengths.append(
@@ -385,14 +523,14 @@ class RenewableRecommendationService:
 
         if overall_site_score >= 70:
             strengths.append(
-                "Overall site conditions are favorable "
-                "for renewable deployment."
+                "Overall site conditions are "
+                "favorable for renewable deployment."
             )
 
         return strengths
 
     # =========================================================
-    # Constraints
+    # CONSTRAINTS
     # =========================================================
 
     @staticmethod
@@ -402,7 +540,7 @@ class RenewableRecommendationService:
         overall_site_score: float,
     ) -> list[str]:
 
-        constraints = []
+        constraints: list[str] = []
 
         if solar_score < 50:
             constraints.append(
@@ -423,7 +561,7 @@ class RenewableRecommendationService:
         return constraints
 
     # =========================================================
-    # Explanation
+    # RECOMMENDATION REASON
     # =========================================================
 
     @staticmethod
@@ -432,47 +570,39 @@ class RenewableRecommendationService:
         solar_score: float,
         wind_score: float,
         hybrid_score: float,
-        constraints: list[str],
     ) -> str:
 
         if technology == RenewableTechnology.SOLAR:
 
             return (
                 "Solar is recommended because the site "
-                "shows stronger solar resource and "
-                "suitability characteristics than wind."
+                "shows stronger solar potential and "
+                "suitability than wind."
             )
 
         if technology == RenewableTechnology.WIND:
 
             return (
                 "Wind is recommended because the site "
-                "shows stronger wind resource and "
-                "suitability characteristics than solar."
+                "shows stronger wind potential and "
+                "suitability than solar."
             )
 
         if technology == RenewableTechnology.HYBRID:
 
             return (
                 "Hybrid solar-wind deployment is recommended "
-                "because both renewable technologies show "
-                "strong and complementary suitability."
-            )
-
-        if technology == RenewableTechnology.UNSUITABLE:
-
-            return (
-                "The site does not currently demonstrate "
-                "sufficient renewable deployment suitability."
+                "because both technologies demonstrate "
+                "strong and complementary site potential."
             )
 
         return (
-            "The site requires further renewable "
-            "deployment assessment."
+            "The site does not currently demonstrate "
+            "sufficient renewable deployment suitability."
         )
 
     # =========================================================
-    # Capacity recommendation type
+    # CAPACITY TYPE
     # =========================================================
 
     @staticmethod
@@ -492,7 +622,7 @@ class RenewableRecommendationService:
         return None
 
     # =========================================================
-    # Helpers
+    # HELPERS
     # =========================================================
 
     @staticmethod
@@ -520,11 +650,12 @@ class RenewableRecommendationService:
             2,
         )
 
-    @staticmethod
+    @classmethod
     def _extract_score(
+        cls,
         intelligence: dict,
         key: str,
-        fallback: float,
+        fallback: float = 0.0,
     ) -> float:
 
         value = intelligence.get(key)
@@ -533,8 +664,6 @@ class RenewableRecommendationService:
             value = value.get("score")
 
         if value is None:
-            return fallback
+            value = fallback
 
-        return RenewableRecommendationService._normalize(
-            value
-        )
+        return cls._normalize(value)

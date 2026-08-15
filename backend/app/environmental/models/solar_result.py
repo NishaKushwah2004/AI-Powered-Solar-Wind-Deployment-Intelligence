@@ -8,9 +8,6 @@ class SolarResult(BaseModel):
     """
 
     ghi: float | None = None
-
     dni: float | None = None
-
     dhi: float | None = None
-
     solar_irradiance: float | None = None

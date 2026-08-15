@@ -3,11 +3,11 @@ from fastapi import (
     Depends,
 )
 
-from sqlalchemy.orm import Session
-
-from app.api.deps import get_db
-
 from app.auth.permissions import require_roles
+
+from app.api.deps import (
+    get_gis_analyst_dashboard_service,
+)
 
 from app.schemas.gis_analyst_dashboard import (
     GISAnalystDashboardResponse,
@@ -30,8 +30,8 @@ router = APIRouter(
 )
 def get_gis_analyst_dashboard(
 
-    db: Session = Depends(
-        get_db
+    service: GISAnalystDashboardService = Depends(
+        get_gis_analyst_dashboard_service,
     ),
 
     current_user=Depends(
@@ -43,11 +43,5 @@ def get_gis_analyst_dashboard(
     ),
 
 ):
-
-    service = (
-        GISAnalystDashboardService(
-            db
-        )
-    )
 
     return service.get_dashboard()

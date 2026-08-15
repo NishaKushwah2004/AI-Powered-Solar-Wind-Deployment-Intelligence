@@ -9,9 +9,9 @@ import joblib
 
 from ml_core.contracts.feature_contracts import (
     get_features,
-    get_schema_version,
     get_target,
-    validate_domain,
+    get_schema_version,
+    validate_domain
 )
 
 
@@ -28,6 +28,8 @@ ML_ARTIFACTS_DIR = (
 class MLArtifacts:
     """
     Complete set of artifacts required for ML inference.
+
+    Artifacts are produced exclusively from observed datasets.
     """
 
     domain: str
@@ -38,23 +40,23 @@ class MLArtifacts:
 
 class MLModelLoader:
     """
-    Loads and caches trained ML artifacts.
+    Production ML artifact loader.
 
     Responsibilities:
-        - Locate model artifacts.
-        - Load trained model.
-        - Load preprocessing pipeline.
-        - Load metadata.
-        - Validate artifact compatibility.
-        - Cache loaded artifacts.
+        - locate trained observed-data artifacts
+        - load model
+        - load preprocessing pipeline
+        - validate metadata
+        - cache artifacts
+        - execute inference
 
-    This class does NOT:
-        - Prepare features.
-        - Fetch environmental data.
-        - Calculate suitability.
-        - Perform business logic.
-        - Handle HTTP requests.
-        - Calculate predictions directly.
+    Does NOT:
+        - fetch environmental data
+        - fetch GIS data
+        - perform heuristic prediction
+        - calculate capacity factors
+        - generate synthetic values
+        - provide ML fallbacks
     """
 
     _artifacts: dict[str, MLArtifacts] = {}
@@ -70,8 +72,7 @@ class MLModelLoader:
         domain = domain.lower().strip()
 
         artifact_dir = (
-            ML_ARTIFACTS_DIR
-            / domain
+            ML_ARTIFACTS_DIR / domain
         )
 
         model_path = (
@@ -142,51 +143,45 @@ class MLModelLoader:
         expected_target = get_target(domain)
         expected_schema = get_schema_version(domain)
 
-        metadata_domain = metadata.get(
-            "domain"
-        )
-
-        if metadata_domain != domain:
+        if metadata.get("domain") != domain:
             raise ValueError(
                 "ML artifact domain mismatch. "
                 f"Expected '{domain}', "
-                f"got '{metadata_domain}'."
+                f"got '{metadata.get('domain')}'."
             )
 
-        metadata_schema = metadata.get(
-            "schema_version"
-        )
-
-        if metadata_schema != expected_schema:
+        if metadata.get("schema_version") != expected_schema:
             raise ValueError(
-                "ML schema version mismatch for "
-                f"'{domain}'. "
+                f"ML schema version mismatch for '{domain}'. "
                 f"Expected '{expected_schema}', "
-                f"got '{metadata_schema}'."
+                f"got '{metadata.get('schema_version')}'."
             )
 
-        metadata_features = metadata.get(
-            "features"
-        )
-
-        if metadata_features != expected_features:
+        if metadata.get("features") != expected_features:
             raise ValueError(
-                "ML feature contract mismatch for "
-                f"'{domain}'. "
+                f"ML feature contract mismatch for '{domain}'. "
                 f"Expected {expected_features}, "
-                f"got {metadata_features}."
+                f"got {metadata.get('features')}."
             )
 
-        metadata_target = metadata.get(
-            "target"
-        )
-
-        if metadata_target != expected_target:
+        if metadata.get("target") != expected_target:
             raise ValueError(
-                "ML target mismatch for "
-                f"'{domain}'. "
+                f"ML target mismatch for '{domain}'. "
                 f"Expected '{expected_target}', "
-                f"got '{metadata_target}'."
+                f"got '{metadata.get('target')}'."
+            )
+
+        # Production artifacts must be observed-data artifacts.
+        if metadata.get("data_source") != "observed":
+            raise ValueError(
+                f"Production {domain} model must use "
+                "observed training data."
+            )
+
+        if metadata.get("dataset_type") != "observed":
+            raise ValueError(
+                f"Production {domain} model must have "
+                "dataset_type='observed'."
             )
 
     @classmethod
@@ -255,9 +250,44 @@ class MLModelLoader:
         return artifacts
 
     @classmethod
+    def predict(
+        cls,
+        features,
+        domain: str,
+    ) -> dict[str, Any]:
+
+        artifacts = cls.load(domain)
+
+        transformed_features = (
+            artifacts.preprocessor.transform(
+                features
+            )
+        )
+
+        prediction = artifacts.model.predict(
+            transformed_features
+        )
+
+        return {
+            "prediction": float(prediction[0]),
+            "model_version": str(
+                artifacts.metadata.get(
+                    "model_version",
+                    "unknown",
+                )
+            ),
+            "data_source": str(
+                artifacts.metadata.get(
+                    "data_source",
+                    "observed",
+                )
+            ),
+        }
+
+    @classmethod
     def preload(cls) -> None:
         """
-        Load all production ML artifacts.
+        Load all production observed-data models.
         """
 
         cls.load("solar")
@@ -265,11 +295,4 @@ class MLModelLoader:
 
     @classmethod
     def clear_cache(cls) -> None:
-        """
-        Clear cached ML artifacts.
-
-        Primarily useful for tests and
-        controlled model reloads.
-        """
-
         cls._artifacts.clear()

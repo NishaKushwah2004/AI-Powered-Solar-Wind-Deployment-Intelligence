@@ -1,5 +1,13 @@
 """
 Shared feature preparation for ML training and inference.
+
+This module defines the boundary between raw data and the
+authoritative ML feature contract.
+
+Important:
+    - Training data may contain missing feature values.
+    - Training preprocessing is responsible for imputation.
+    - Online prediction must NOT silently invent required values.
 """
 
 from __future__ import annotations
@@ -9,47 +17,94 @@ from typing import Iterable
 import pandas as pd
 
 from ml_core.contracts.feature_contracts import (
-    DEFAULTS,
     get_features,
     get_target,
 )
 
 
+def _to_dataframe(
+    records: Iterable[dict] | pd.DataFrame,
+) -> pd.DataFrame:
+
+    if isinstance(records, pd.DataFrame):
+        return records.copy()
+
+    return pd.DataFrame(records)
+
+
 def prepare_features(
     records: Iterable[dict] | pd.DataFrame,
     domain: str,
+    *,
+    allow_missing: bool = False,
 ) -> pd.DataFrame:
     """
-    Prepare model features using the authoritative feature contract.
+    Prepare features according to the authoritative contract.
 
-    Guarantees:
-        - required features exist
-        - correct feature order
-        - numeric conversion
-        - default filling for missing values
+    Parameters
+    ----------
+    records:
+        Input records or dataframe.
+
+    domain:
+        'solar' or 'wind'.
+
+    allow_missing:
+        True for training data where the fitted preprocessing
+        pipeline will handle missing values.
+
+        False for online inference where required values must
+        be explicitly supplied.
+
+    Returns
+    -------
+    pd.DataFrame
+        Features in authoritative order.
     """
 
     features = get_features(domain)
 
-    if isinstance(records, pd.DataFrame):
-        frame = records.copy()
-    else:
-        frame = pd.DataFrame(records)
+    frame = _to_dataframe(records)
+
+    missing_columns = [
+        feature
+        for feature in features
+        if feature not in frame.columns
+    ]
+
+    if missing_columns and not allow_missing:
+        raise ValueError(
+            f"Missing required prediction features for "
+            f"{domain}: {missing_columns}"
+        )
 
     for feature in features:
+
         if feature not in frame.columns:
-            frame[feature] = DEFAULTS.get(feature, 0.0)
+            frame[feature] = pd.NA
 
         frame[feature] = pd.to_numeric(
             frame[feature],
             errors="coerce",
         )
 
-        frame[feature] = frame[feature].fillna(
-            DEFAULTS.get(feature, 0.0)
-        )
+    result = frame[features].copy()
 
-    return frame[features].copy()
+    if not allow_missing:
+
+        missing_values = [
+            feature
+            for feature in features
+            if result[feature].isna().any()
+        ]
+
+        if missing_values:
+            raise ValueError(
+                f"Missing or invalid prediction values for "
+                f"{domain}: {missing_values}"
+            )
+
+    return result
 
 
 def prepare_training_data(
@@ -57,7 +112,10 @@ def prepare_training_data(
     domain: str,
 ) -> tuple[pd.DataFrame, pd.Series]:
     """
-    Split a validated dataset into model features and target.
+    Prepare training features and target.
+
+    Missing feature values are allowed here because the fitted
+    preprocessing pipeline performs training-time imputation.
     """
 
     features = get_features(domain)
@@ -80,7 +138,11 @@ def prepare_training_data(
             f"Missing target '{target}' for {domain}."
         )
 
-    X = prepare_features(dataframe, domain)
+    X = prepare_features(
+        dataframe,
+        domain,
+        allow_missing=True,
+    )
 
     y = pd.to_numeric(
         dataframe[target],
@@ -89,7 +151,8 @@ def prepare_training_data(
 
     if y.isna().any():
         raise ValueError(
-            f"Target '{target}' contains invalid or missing values."
+            f"Target '{target}' contains invalid "
+            "or missing values."
         )
 
     return X, y
@@ -99,9 +162,6 @@ def assert_feature_parity(
     frame: pd.DataFrame,
     domain: str,
 ) -> None:
-    """
-    Ensure dataframe columns exactly match the ML feature contract.
-    """
 
     expected = get_features(domain)
     actual = list(frame.columns)
@@ -117,7 +177,6 @@ def assert_target(
     dataframe: pd.DataFrame,
     domain: str,
 ) -> None:
-    """Ensure the authoritative target exists."""
 
     target = get_target(domain)
 
@@ -134,10 +193,20 @@ def prepare_prediction_record(
 ) -> pd.DataFrame:
     """
     Prepare a single online prediction record.
+
+    Unlike training data, prediction inputs must contain
+    valid values for every required feature.
     """
 
-    frame = prepare_features([record], domain)
+    frame = prepare_features(
+        [record],
+        domain,
+        allow_missing=False,
+    )
 
-    assert_feature_parity(frame, domain)
+    assert_feature_parity(
+        frame,
+        domain,
+    )
 
     return frame

@@ -15,6 +15,14 @@ class ProjectRepository(BaseRepository[Project]):
             .all()
         )
 
+    def get_by_owner(self, user_id: int):
+        return (
+            self.db.query(Project)
+            .filter(Project.created_by == user_id)
+            .order_by(Project.created_at.desc())
+            .all()
+        )
+
     def get_by_id(self, project_id: int):
         return (
             self.db.query(Project)

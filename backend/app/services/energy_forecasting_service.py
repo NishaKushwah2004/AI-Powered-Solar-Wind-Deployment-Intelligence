@@ -19,21 +19,29 @@ from app.schemas.energy_forecasting import (
     SeasonalForecast,
 )
 
+from app.services.deployment_optimization_service import (
+    DeploymentOptimizationService,
+)
+
 
 class EnergyForecastingService:
     """
     Energy Forecasting Engine.
 
-    Converts deployment/prediction inputs into:
+    Flow:
 
-        Annual generation
-        Monthly generation
-        Seasonal generation
-        Long-term generation
-        Grid contribution
-        Revenue forecast
-
-    This service does not train or execute ML models.
+        Site
+          ↓
+        Site Suitability
+          ↓
+        Renewable Recommendation
+          ↓
+        Deployment Optimization
+          ↓
+        Energy Forecasting
+          ↓
+        Annual / Monthly / Seasonal /
+        Long-Term / Grid / Revenue Forecast
     """
 
     DEFAULT_ELECTRICITY_PRICE = 5000.0
@@ -63,9 +71,15 @@ class EnergyForecastingService:
     def __init__(
         self,
         db: Session,
+        deployment_optimization_service:
+            DeploymentOptimizationService,
     ):
         self.repository = (
             EnergyForecastingRepository(db)
+        )
+
+        self.deployment_optimization_service = (
+            deployment_optimization_service
         )
 
     # =========================================================
@@ -75,8 +89,11 @@ class EnergyForecastingService:
     def forecast(
         self,
         site_id: int,
-        intelligence: dict,
     ) -> EnergyForecastResponse:
+
+        # =====================================================
+        # SITE VALIDATION
+        # =====================================================
 
         site = self.repository.get_site(
             site_id
@@ -87,44 +104,68 @@ class EnergyForecastingService:
                 f"Site {site_id} not found."
             )
 
+        # =====================================================
+        # GET AUTHORITATIVE DEPLOYMENT PLAN
+        # =====================================================
+
+        deployment = (
+            self.deployment_optimization_service.optimize_site(
+                site_id=site_id,
+            )
+        )
+
+        intelligence = deployment.model_dump()
+
+        # =====================================================
+        # TECHNOLOGY
+        # =====================================================
+
         technology = self._get_technology(
             intelligence
         )
 
+        # =====================================================
+        # CAPACITY
+        # =====================================================
+
+        capacity_plan = intelligence.get(
+            "capacity_plan",
+            {},
+        ) or {}
+
         capacity_mw = self._normalize(
-            intelligence.get("capacity_mw")
+            capacity_plan.get(
+                "recommended_capacity_mw"
+            )
         )
 
         solar_capacity_mw = self._normalize(
-            intelligence.get(
+            capacity_plan.get(
                 "solar_capacity_mw"
             )
         )
 
         wind_capacity_mw = self._normalize(
-            intelligence.get(
+            capacity_plan.get(
                 "wind_capacity_mw"
             )
         )
 
-        if capacity_mw <= 0:
-            capacity_mw = round(
-                solar_capacity_mw
-                + wind_capacity_mw,
-                2,
-            )
+        # =====================================================
+        # CAPACITY FACTORS
+        # =====================================================
 
-        solar_cf = self._get_capacity_factor(
-            intelligence,
-            "solar_capacity_factor",
-            self.DEFAULT_SOLAR_CAPACITY_FACTOR,
+        solar_cf = (
+            self.DEFAULT_SOLAR_CAPACITY_FACTOR
         )
 
-        wind_cf = self._get_capacity_factor(
-            intelligence,
-            "wind_capacity_factor",
-            self.DEFAULT_WIND_CAPACITY_FACTOR,
+        wind_cf = (
+            self.DEFAULT_WIND_CAPACITY_FACTOR
         )
+
+        # =====================================================
+        # ANNUAL GENERATION
+        # =====================================================
 
         annual_generation = (
             self._calculate_annual_generation(
@@ -137,6 +178,10 @@ class EnergyForecastingService:
             )
         )
 
+        # =====================================================
+        # MONTHLY
+        # =====================================================
+
         monthly_forecast = (
             self._build_monthly_forecast(
                 annual_generation=annual_generation,
@@ -148,33 +193,50 @@ class EnergyForecastingService:
             )
         )
 
+        # =====================================================
+        # SEASONAL
+        # =====================================================
+
         seasonal_forecast = (
             self._build_seasonal_forecast(
                 monthly_forecast
             )
         )
 
+        # =====================================================
+        # GRID CONTRIBUTION
+        # =====================================================
+
         grid_contribution = (
             self._build_grid_contribution(
                 annual_generation,
-                intelligence,
             )
         )
+
+        # =====================================================
+        # REVENUE
+        # =====================================================
 
         revenue_forecast = (
             self._build_revenue_forecast(
                 annual_generation,
-                intelligence,
             )
         )
+
+        # =====================================================
+        # LONG TERM
+        # =====================================================
 
         long_term_forecast = (
             self._build_long_term_forecast(
                 annual_generation,
                 revenue_forecast.estimated_annual_revenue,
-                intelligence,
             )
         )
+
+        # =====================================================
+        # CAPACITY FACTOR
+        # =====================================================
 
         capacity_factor = (
             self._calculate_combined_capacity_factor(
@@ -183,27 +245,43 @@ class EnergyForecastingService:
             )
         )
 
-        assumptions = (
-            self._build_assumptions(
-                intelligence
-            )
-        )
+        # =====================================================
+        # ASSUMPTIONS
+        # =====================================================
+
+        assumptions = self._build_assumptions()
+
+
+        # =====================================================
+        # FINAL RESPONSE
+        # =====================================================
 
         return EnergyForecastResponse(
             site_id=site_id,
+
             technology=technology,
+
             forecast_period=ForecastPeriod.ANNUAL,
+
             annual_generation_mwh=round(
                 annual_generation,
                 2,
             ),
+
             monthly_forecast=monthly_forecast,
+
             seasonal_forecast=seasonal_forecast,
+
             long_term_forecast=long_term_forecast,
+
             grid_contribution=grid_contribution,
+
             revenue_forecast=revenue_forecast,
+
             capacity_mw=capacity_mw,
+
             capacity_factor=capacity_factor,
+
             forecasting_assumptions=assumptions,
         )
 
@@ -217,14 +295,18 @@ class EnergyForecastingService:
     ) -> ForecastTechnology:
 
         value = intelligence.get(
-            "recommended_technology"
+            "technology"
         )
 
         if value is None:
             return ForecastTechnology.SOLAR
 
+        if hasattr(value, "value"):
+            value = value.value
+
         try:
             return ForecastTechnology(value)
+
         except ValueError:
             return ForecastTechnology.SOLAR
 
@@ -354,15 +436,19 @@ class EnergyForecastingService:
             forecasts.append(
                 MonthlyForecast(
                     month=month,
+
                     month_name=month_name[month],
+
                     solar_generation_mwh=round(
                         solar_generation,
                         2,
                     ),
+
                     wind_generation_mwh=round(
                         wind_generation,
                         2,
                     ),
+
                     total_generation_mwh=round(
                         total,
                         2,
@@ -414,10 +500,12 @@ class EnergyForecastingService:
             results.append(
                 SeasonalForecast(
                     season=season,
+
                     generation_mwh=round(
                         generation,
                         2,
                     ),
+
                     percentage_of_annual_generation=round(
                         percentage,
                         2,
@@ -435,22 +523,10 @@ class EnergyForecastingService:
         self,
         annual_generation: float,
         annual_revenue: float,
-        intelligence: dict,
     ) -> list[LongTermForecast]:
 
-        degradation_rate = self._percentage(
-            intelligence.get(
-                "annual_degradation_rate"
-            ),
-            default=0.0,
-        )
-
-        escalation_rate = self._percentage(
-            intelligence.get(
-                "annual_revenue_growth_rate"
-            ),
-            default=0.0,
-        )
+        degradation_rate = 0.0
+        escalation_rate = 0.0
 
         forecasts = []
 
@@ -477,10 +553,12 @@ class EnergyForecastingService:
             forecasts.append(
                 LongTermForecast(
                     year=year,
+
                     estimated_generation_mwh=round(
                         generation,
                         2,
                     ),
+
                     estimated_revenue=round(
                         revenue,
                         2,
@@ -497,24 +575,11 @@ class EnergyForecastingService:
     def _build_grid_contribution(
         self,
         annual_generation: float,
-        intelligence: dict,
     ) -> GridContributionForecast:
 
-        percentage = self._normalize(
-            intelligence.get(
-                "grid_contribution_percentage"
-            )
-        )
-
-        if percentage <= 0:
-            percentage = (
-                self.DEFAULT_GRID_CONTRIBUTION
-                * 100
-            )
-
-        percentage = min(
-            100.0,
-            percentage,
+        percentage = (
+            self.DEFAULT_GRID_CONTRIBUTION
+            * 100
         )
 
         grid_generation = (
@@ -528,10 +593,12 @@ class EnergyForecastingService:
                 annual_generation,
                 2,
             ),
+
             estimated_grid_contribution_mwh=round(
                 grid_generation,
                 2,
             ),
+
             grid_contribution_percentage=round(
                 percentage,
                 2,
@@ -545,22 +612,15 @@ class EnergyForecastingService:
     def _build_revenue_forecast(
         self,
         annual_generation: float,
-        intelligence: dict,
     ) -> RevenueForecast:
 
-        price = self._normalize(
-            intelligence.get(
-                "electricity_price_per_mwh"
-            )
+        price = (
+            self.DEFAULT_ELECTRICITY_PRICE
         )
 
-        if price <= 0:
-            price = (
-                self.DEFAULT_ELECTRICITY_PRICE
-            )
-
         revenue = (
-            annual_generation * price
+            annual_generation
+            * price
         )
 
         return RevenueForecast(
@@ -568,14 +628,17 @@ class EnergyForecastingService:
                 annual_generation,
                 2,
             ),
+
             electricity_price_per_mwh=round(
                 price,
                 2,
             ),
+
             estimated_annual_revenue=round(
                 revenue,
                 2,
             ),
+
             currency="INR",
         )
 
@@ -609,100 +672,21 @@ class EnergyForecastingService:
     # ASSUMPTIONS
     # =========================================================
 
-    def _build_assumptions(
-        self,
-        intelligence: dict,
-    ) -> list[str]:
+    def _build_assumptions(self) -> list[str]:
 
-        assumptions = []
-
-        if not intelligence.get(
-            "solar_capacity_factor"
-        ):
-            assumptions.append(
-                "Default solar capacity factor was used."
-            )
-
-        if not intelligence.get(
-            "wind_capacity_factor"
-        ):
-            assumptions.append(
-                "Default wind capacity factor was used."
-            )
-
-        if not intelligence.get(
-            "electricity_price_per_mwh"
-        ):
-            assumptions.append(
-                "Default electricity price was used."
-            )
-
-        if not intelligence.get(
-            "annual_degradation_rate"
-        ):
-            assumptions.append(
-                "No degradation rate was provided; "
-                "zero degradation was assumed."
-            )
-
-        return assumptions
+        return [
+            "Capacity and technology were obtained from the deployment optimization engine.",
+            "Default solar capacity factor of 20% was used.",
+            "Default wind capacity factor of 35% was used.",
+            "Default electricity price of INR 5000/MWh was used.",
+            "Zero annual generation degradation was assumed.",
+            "Zero annual revenue escalation was assumed.",
+            "Grid contribution was assumed to be 90%.",
+        ]
 
     # =========================================================
     # HELPERS
     # =========================================================
-
-    @staticmethod
-    def _get_capacity_factor(
-        intelligence: dict,
-        key: str,
-        default: float,
-    ) -> float:
-
-        value = intelligence.get(key)
-
-        if value is None:
-            return default
-
-        try:
-            value = float(value)
-        except (
-            TypeError,
-            ValueError,
-        ):
-            return default
-
-        if value > 1:
-            value /= 100
-
-        return max(
-            0.0,
-            min(1.0, value),
-        )
-
-    @staticmethod
-    def _percentage(
-        value,
-        default: float = 0.0,
-    ) -> float:
-
-        if value is None:
-            return default
-
-        try:
-            value = float(value)
-        except (
-            TypeError,
-            ValueError,
-        ):
-            return default
-
-        if value > 1:
-            value /= 100
-
-        return max(
-            0.0,
-            min(1.0, value),
-        )
 
     @staticmethod
     def _normalize(
@@ -714,6 +698,7 @@ class EnergyForecastingService:
 
         try:
             value = float(value)
+
         except (
             TypeError,
             ValueError,

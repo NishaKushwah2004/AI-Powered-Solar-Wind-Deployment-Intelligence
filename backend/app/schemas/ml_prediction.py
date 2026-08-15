@@ -35,11 +35,6 @@ class SolarPredictionRequest(BaseModel):
         ge=0,
     )
 
-    gti: float = Field(
-        ...,
-        ge=0,
-    )
-
     temperature_c: float
 
     humidity_pct: float = Field(

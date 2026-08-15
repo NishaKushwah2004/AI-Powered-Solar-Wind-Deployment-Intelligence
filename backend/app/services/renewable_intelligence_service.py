@@ -1,9 +1,13 @@
-from app.prediction.models.prediction_input import (
-    PredictionInput,
+from __future__ import annotations
+
+from app.prediction.feature_builder.prediction_feature_builder import (
+    PredictionFeatureBuilder,
 )
+
 from app.prediction.services.prediction_service import (
     PredictionService,
 )
+
 from app.services.environmental_service import (
     EnvironmentalService,
 )
@@ -11,29 +15,52 @@ from app.services.environmental_service import (
 
 class RenewableIntelligenceService:
     """
-    Coordinates environmental analysis and renewable
-    energy prediction.
+    Orchestrates environmental/GIS intelligence and
+    ML-based renewable energy prediction.
 
-    Acts as the orchestration layer between the
-    Environmental Intelligence Engine and the
-    Prediction Engine.
+    Flow:
+
+        Site
+          ↓
+        EnvironmentalService
+          ↓
+        EnvironmentalReport
+          ↓
+        PredictionFeatureBuilder
+          ↓
+        SolarPredictionRequest
+        WindPredictionRequest
+          ↓
+        PredictionService
+          ↓
+        Solar ML + Wind ML
+          ↓
+        Renewable prediction
     """
 
     def __init__(
         self,
         environmental_service: EnvironmentalService,
         prediction_service: PredictionService,
-    ):
+    ) -> None:
+
         self.environmental_service = environmental_service
         self.prediction_service = prediction_service
+
+    # =========================================================
+    # SITE ANALYSIS
+    # =========================================================
 
     def analyze_site(
         self,
         site_id: int,
-    ):
+    ) -> dict:
         """
-        Generate a complete renewable intelligence report
-        for a site.
+        Generate complete renewable intelligence
+        for a single site.
+
+        EnvironmentalReport is the source of truth for
+        environmental and GIS features.
         """
 
         environment = (
@@ -42,21 +69,81 @@ class RenewableIntelligenceService:
             )
         )
 
-        site = environment["site"]
+        # -----------------------------------------------------
+        # EnvironmentalReport is a Pydantic model.
+        # It does NOT contain a `site` ORM object.
+        # -----------------------------------------------------
 
-        prediction_input = PredictionInput(
-            latitude=site.latitude,
-            longitude=site.longitude,
-            weather=environment["weather"],
-            solar=environment["solar"],
-            gis=environment["gis"],
-        )
+        site_id_value = environment.site_id
 
-        predictions = (
-            self.prediction_service.predict(
-                prediction_input,
+        if site_id_value is None:
+            raise ValueError(
+                "Environmental report does not contain site_id."
+            )
+
+        # -----------------------------------------------------
+        # Fetch the actual Site ORM object because the
+        # PredictionFeatureBuilder requires latitude/longitude.
+        # -----------------------------------------------------
+
+        site = (
+            self.environmental_service.site_repository.get_by_id(
+                site_id_value
             )
         )
+
+        if site is None:
+            raise ValueError(
+                f"Site {site_id_value} not found."
+            )
+
+        # -----------------------------------------------------
+        # Convert EnvironmentalReport into the dictionary
+        # expected by PredictionFeatureBuilder.
+        # -----------------------------------------------------
+
+        environment_data = {
+            "weather": environment.weather.model_dump(),
+            "solar": environment.solar.model_dump(),
+            "gis": (
+                environment.gis.model_dump()
+                if environment.gis is not None
+                else {}
+            ),
+        }
+
+        # -----------------------------------------------------
+        # Build ML feature requests
+        # -----------------------------------------------------
+
+        solar_request = (
+            PredictionFeatureBuilder.build_solar(
+                site=site,
+                environment=environment_data,
+            )
+        )
+
+        wind_request = (
+            PredictionFeatureBuilder.build_wind(
+                site=site,
+                environment=environment_data,
+            )
+        )
+
+        # -----------------------------------------------------
+        # Execute ML prediction
+        # -----------------------------------------------------
+
+        prediction = (
+            self.prediction_service.predict_renewable(
+                solar_request=solar_request,
+                wind_request=wind_request,
+            )
+        )
+
+        # -----------------------------------------------------
+        # Response
+        # -----------------------------------------------------
 
         return {
             "site": {
@@ -65,17 +152,21 @@ class RenewableIntelligenceService:
                 "latitude": site.latitude,
                 "longitude": site.longitude,
             },
-            "environment": environment["assessment"],
-            "predictions": predictions,
+            "environment": environment_data,
+            "predictions": prediction,
         }
+
+    # =========================================================
+    # PROJECT ANALYSIS
+    # =========================================================
 
     def analyze_project(
         self,
         project_id: int,
-    ):
+    ) -> dict:
         """
-        Generate renewable intelligence reports
-        for every site in a project.
+        Generate renewable intelligence for every
+        site belonging to a project.
         """
 
         project = (
@@ -90,17 +181,61 @@ class RenewableIntelligenceService:
 
             site = item["site"]
 
-            prediction_input = PredictionInput(
-                latitude=site.latitude,
-                longitude=site.longitude,
-                weather=item["weather"],
-                solar=item["solar"],
-                gis=item["gis"],
+            environment_data = {
+                "weather": (
+                    item["weather"].model_dump()
+                    if hasattr(
+                        item["weather"],
+                        "model_dump",
+                    )
+                    else item["weather"]
+                ),
+
+                "solar": (
+                    item["solar"].model_dump()
+                    if hasattr(
+                        item["solar"],
+                        "model_dump",
+                    )
+                    else item["solar"]
+                ),
+
+                "gis": (
+                    item["gis"].model_dump()
+                    if hasattr(
+                        item["gis"],
+                        "model_dump",
+                    )
+                    else item["gis"]
+                ),
+            }
+
+            # -------------------------------------------------
+            # Build ML requests
+            # -------------------------------------------------
+
+            solar_request = (
+                PredictionFeatureBuilder.build_solar(
+                    site=site,
+                    environment=environment_data,
+                )
             )
 
+            wind_request = (
+                PredictionFeatureBuilder.build_wind(
+                    site=site,
+                    environment=environment_data,
+                )
+            )
+
+            # -------------------------------------------------
+            # Execute ML prediction
+            # -------------------------------------------------
+
             prediction = (
-                self.prediction_service.predict(
-                    prediction_input,
+                self.prediction_service.predict_renewable(
+                    solar_request=solar_request,
+                    wind_request=wind_request,
                 )
             )
 
@@ -109,8 +244,10 @@ class RenewableIntelligenceService:
                     "site": {
                         "id": site.id,
                         "name": site.name,
+                        "latitude": site.latitude,
+                        "longitude": site.longitude,
                     },
-                    "environment": item["assessment"],
+                    "environment": environment_data,
                     "prediction": prediction,
                 }
             )

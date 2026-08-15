@@ -1,14 +1,11 @@
 from typing import Optional
 
-from app.schemas.base import BaseSchema
 from pydantic import Field
+
+from app.schemas.base import BaseSchema
 
 
 class SiteBase(BaseSchema):
-    """
-    Common fields shared by all site schemas.
-    """
-
     name: str = Field(
         min_length=3,
         max_length=150,
@@ -19,24 +16,16 @@ class SiteBase(BaseSchema):
     latitude: float = Field(
         ge=-90,
         le=90,
-        description="Latitude must be between -90 and 90",
     )
 
     longitude: float = Field(
         ge=-180,
         le=180,
-        description="Longitude must be between -180 and 180",
     )
-
-    # -------------------------
-    # Site Information
-    # -------------------------
 
     region: Optional[str] = None
 
     land_area: Optional[float] = None
-
-    elevation: Optional[float] = None
 
     existing_infrastructure: Optional[str] = None
 
@@ -44,18 +33,15 @@ class SiteBase(BaseSchema):
 
 
 class SiteCreate(SiteBase):
-    """
-    Schema used when creating a site.
-    """
     pass
 
 
 class SiteUpdate(BaseSchema):
-    """
-    Schema used when updating a site.
-    """
-
-    name: Optional[str] = None
+    name: Optional[str] = Field(
+        default=None,
+        min_length=3,
+        max_length=150,
+    )
 
     description: Optional[str] = None
 
@@ -75,35 +61,15 @@ class SiteUpdate(BaseSchema):
 
     land_area: Optional[float] = None
 
-    elevation: Optional[float] = None
-
     existing_infrastructure: Optional[str] = None
-
-    land_use: Optional[str] = None
-
-    road_distance: Optional[float] = None
-
-    nearest_substation_distance: Optional[float] = None
-
-    nearest_transmission_line_distance: Optional[float] = None
-
-    water_body_distance: Optional[float] = None
-
-    protected_area_distance: Optional[float] = None
-
-    land_slope: Optional[float] = None
-
-    vegetation_index: Optional[float] = None
 
     project_id: Optional[int] = None
 
 
 class SiteResponse(SiteBase):
-    """
-    Schema returned by the API.
-    """
-
     id: int
+
+    elevation: Optional[float] = None
 
     land_use: Optional[str] = None
 
@@ -120,3 +86,5 @@ class SiteResponse(SiteBase):
     land_slope: Optional[float] = None
 
     vegetation_index: Optional[float] = None
+
+    created_at: object

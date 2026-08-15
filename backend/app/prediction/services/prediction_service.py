@@ -3,8 +3,13 @@ from __future__ import annotations
 from app.prediction.predictors.solar_predictor import (
     SolarPredictor,
 )
+
 from app.prediction.predictors.wind_predictor import (
     WindPredictor,
+)
+
+from app.prediction.predictors.hybrid_predictor import (
+    HybridPredictor,
 )
 
 from app.schemas.ml_prediction import (
@@ -21,71 +26,75 @@ from app.schemas.unified_prediction import (
 
 class PredictionService:
     """
-    Single orchestration layer for renewable prediction.
+    Orchestrates production ML prediction.
 
     Architecture:
 
-        API
-          ↓
+        Environmental/GIS
+              ↓
+        PredictionRequest
+              ↓
         PredictionService
-          ↓
-        SolarPredictor / WindPredictor
-          ↓
-        MLModelLoader
-          ↓
-        trained ML model
+          ↙          ↘
+      Solar ML      Wind ML
+          ↘          ↙
+         Hybrid
     """
 
     def __init__(
         self,
         solar_predictor: SolarPredictor,
         wind_predictor: WindPredictor,
+        hybrid_predictor: HybridPredictor,
     ) -> None:
 
         self.solar_predictor = solar_predictor
         self.wind_predictor = wind_predictor
-
-    # ------------------------------------------------------------------
-    # Solar
-    # ------------------------------------------------------------------
+        self.hybrid_predictor = hybrid_predictor
 
     def predict_solar(
         self,
         data: SolarPredictionRequest,
     ) -> PredictionResponse:
-        """
-        Delegate solar prediction to SolarPredictor.
-        """
 
-        return self.solar_predictor.predict(data)
-
-    # ------------------------------------------------------------------
-    # Wind
-    # ------------------------------------------------------------------
+        return self.solar_predictor.predict(
+            data
+        )
 
     def predict_wind(
         self,
         data: WindPredictionRequest,
     ) -> PredictionResponse:
-        """
-        Delegate wind prediction to WindPredictor.
-        """
 
-        return self.wind_predictor.predict(data)
-
-    # ------------------------------------------------------------------
-    # Renewable / hybrid
-    # ------------------------------------------------------------------
+        return self.wind_predictor.predict(
+            data
+        )
 
     def predict_renewable(
         self,
+        solar_request: SolarPredictionRequest,
+        wind_request: WindPredictionRequest,
+    ) -> RenewablePredictionResponse:
+
+        solar = self.solar_predictor.predict(
+            solar_request
+        )
+
+        wind = self.wind_predictor.predict(
+            wind_request
+        )
+
+        return self.hybrid_predictor.predict(
+            solar_prediction=solar,
+            wind_prediction=wind,
+            latitude=solar_request.latitude,
+            longitude=solar_request.longitude,
+        )
+
+    def predict(
+        self,
         data: RenewablePredictionRequest,
     ) -> RenewablePredictionResponse:
-        """
-        Execute both ML models and combine their outputs.
-
-        No heuristic prediction is performed here.
-        """
 
         solar_request = SolarPredictionRequest(
             latitude=data.latitude,
@@ -93,7 +102,6 @@ class PredictionService:
             ghi=data.ghi,
             dni=data.dni,
             dhi=data.dhi,
-            gti=data.gti,
             temperature_c=data.temperature_c,
             humidity_pct=data.humidity_pct,
             cloud_cover_pct=data.cloud_cover_pct,
@@ -113,36 +121,7 @@ class PredictionService:
             elevation_m=data.elevation_m,
         )
 
-        solar = self.predict_solar(
-            solar_request
+        return self.predict_renewable(
+            solar_request=solar_request,
+            wind_request=wind_request,
         )
-
-        wind = self.predict_wind(
-            wind_request
-        )
-
-        return RenewablePredictionResponse(
-            latitude=data.latitude,
-            longitude=data.longitude,
-            solar_generation_mw=solar.prediction_mw,
-            wind_generation_mw=wind.prediction_mw,
-            total_generation_mw=(
-                solar.prediction_mw
-                + wind.prediction_mw
-            ),
-            model_version=(
-                f"solar:{solar.model_version};"
-                f"wind:{wind.model_version}"
-            ),
-            data_source=(
-                f"solar:{solar.data_source};"
-                f"wind:{wind.data_source}"
-            ),
-        )
-
-    # Backward-compatible method name if existing callers use predict().
-    def predict(
-        self,
-        data: RenewablePredictionRequest,
-    ) -> RenewablePredictionResponse:
-        return self.predict_renewable(data)

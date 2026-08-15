@@ -4,9 +4,10 @@ from fastapi import (
     HTTPException,
     status,
 )
-from sqlalchemy.orm import Session
 
-from app.api.deps import get_db
+from app.api.deps import (
+    get_deployment_optimization_service,
+)
 
 from app.auth.permissions import require_roles
 
@@ -31,8 +32,11 @@ router = APIRouter(
 )
 def optimize_site_deployment(
     site_id: int,
-    intelligence: dict,
-    db: Session = Depends(get_db),
+
+    service: DeploymentOptimizationService = Depends(
+        get_deployment_optimization_service,
+    ),
+
     current_user=Depends(
         require_roles(
             "Renewable Energy Planner",
@@ -43,13 +47,10 @@ def optimize_site_deployment(
     ),
 ):
 
-    service = DeploymentOptimizationService(db)
-
     try:
 
         return service.optimize_site(
             site_id=site_id,
-            intelligence=intelligence,
         )
 
     except ValueError as exc:

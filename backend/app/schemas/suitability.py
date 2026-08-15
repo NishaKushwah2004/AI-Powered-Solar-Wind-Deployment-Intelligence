@@ -13,23 +13,48 @@ class SuitabilityCategory(str, Enum):
 
 
 class SuitabilityFactor(BaseModel):
-    score: float = Field(..., ge=0, le=100)
-    weight: float = Field(..., ge=0, le=1)
-    weighted_score: float = Field(..., ge=0, le=100)
+    score: float = Field(
+        ...,
+        ge=0,
+        le=100,
+    )
+
+    weight: float = Field(
+        ...,
+        ge=0,
+        le=1,
+    )
+
+    weighted_score: float = Field(
+        ...,
+        ge=0,
+        le=100,
+    )
+
     status: str
+
     explanation: Optional[str] = None
 
 
 class SiteSuitabilityResponse(BaseModel):
     site_id: int
 
-    overall_score: float = Field(..., ge=0, le=100)
+    overall_score: float = Field(
+        ...,
+        ge=0,
+        le=100,
+    )
+
     category: SuitabilityCategory
 
     renewable_resource: SuitabilityFactor
+
     geographic_suitability: SuitabilityFactor
+
     infrastructure_accessibility: SuitabilityFactor
+
     environmental_impact: SuitabilityFactor
+
     economic_feasibility: SuitabilityFactor
 
     deployment_feasible: bool
@@ -37,16 +62,17 @@ class SiteSuitabilityResponse(BaseModel):
     recommendation: str
 
     strengths: list[str]
+
     constraints: list[str]
 
     solar_score: Optional[float] = Field(
         default=None,
         ge=0,
-        le=100
+        le=100,
     )
 
     wind_score: Optional[float] = Field(
         default=None,
         ge=0,
-        le=100
+        le=100,
     )

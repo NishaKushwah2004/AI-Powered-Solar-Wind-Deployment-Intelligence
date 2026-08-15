@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from sqlalchemy.orm import Session
 
 from app.repositories.gis_analyst_dashboard_repository import (
@@ -13,267 +15,414 @@ from app.schemas.gis_analyst_dashboard import (
     TerrainMapSite,
 )
 
+from app.services.site_suitability_service import (
+    SiteSuitabilityService,
+)
+
 
 class GISAnalystDashboardService:
+    """
+    GIS Analyst Dashboard orchestration service.
 
-    def __init__(self, db: Session):
+    Responsibilities:
+        - Read persisted site/GIS enrichment data.
+        - Aggregate GIS/environmental analytics.
+        - Build terrain information.
+        - Build site comparison data.
+        - Obtain the authoritative suitability score from
+          SiteSuitabilityService.
 
+    This service does NOT:
+        - call GIS providers directly
+        - perform GIS enrichment
+        - calculate another suitability formula
+        - calculate ML predictions
+        - modify Site records
+    """
+
+    def __init__(
+        self,
+        db: Session,
+        site_suitability_service: SiteSuitabilityService,
+    ):
         self.repository = (
             GISAnalystDashboardRepository(db)
         )
+
+        self.site_suitability_service = (
+            site_suitability_service
+        )
+
+    # =========================================================
+    # MAIN DASHBOARD
+    # =========================================================
 
     def get_dashboard(
         self,
     ) -> GISAnalystDashboardResponse:
 
-        sites = (
-            self.repository.get_sites()
-        )
+        sites = self.repository.get_sites()
 
-        visualization_sites = []
+        visualization_sites: list[
+            GISVisualizationSite
+        ] = []
 
-        terrain_sites = []
+        terrain_sites: list[
+            TerrainMapSite
+        ] = []
 
-        comparison_sites = []
+        comparison_sites: list[
+            SiteComparisonItem
+        ] = []
 
-        vegetation_values = []
-        water_distances = []
-        protected_distances = []
-        road_distances = []
-        substation_distances = []
-        transmission_distances = []
-        slope_values = []
+        # -----------------------------------------------------
+        # Analytics collections
+        # -----------------------------------------------------
+
+        slope_values: list[float] = []
+        vegetation_values: list[float] = []
+
+        water_distance_values: list[float] = []
+        protected_distance_values: list[float] = []
+
+        road_distance_values: list[float] = []
+        substation_distance_values: list[float] = []
+        transmission_distance_values: list[float] = []
 
         enriched_sites = 0
 
+        # =====================================================
+        # PROCESS EACH SITE
+        # =====================================================
 
         for site in sites:
 
-            site_id = site.id
+            site_id = int(site.id)
 
-            site_name = getattr(
-                site,
-                "name",
-                f"Site {site_id}",
-            )
+            site_name = self._site_name(site)
 
-            latitude = self._number(
+            latitude = self._float(
                 getattr(
                     site,
                     "latitude",
-                    0,
+                    None,
                 )
             )
 
-            longitude = self._number(
+            longitude = self._float(
                 getattr(
                     site,
                     "longitude",
-                    0,
+                    None,
                 )
             )
 
+            # =================================================
+            # GIS DATA
+            # =================================================
 
-            suitability_score = self._number(
-                getattr(
-                    site,
-                    "suitability_score",
-                    getattr(
-                        site,
-                        "overall_deployment_score",
-                        0,
-                    ),
-                )
-            )
-
-
-            land_use = str(
+            land_use = (
                 getattr(
                     site,
                     "land_use",
-                    "Unknown",
+                    None,
                 )
+                or "Unknown"
             )
 
-
-            land_slope = self._number(
+            land_slope = self._float(
                 getattr(
                     site,
                     "land_slope",
-                    0,
+                    None,
                 )
             )
 
-
-            vegetation_index = self._number(
+            vegetation_index = self._float(
                 getattr(
                     site,
                     "vegetation_index",
-                    0,
+                    None,
                 )
             )
 
-
-            road_distance = self._number(
+            road_distance = self._float(
                 getattr(
                     site,
                     "road_distance",
-                    0,
+                    None,
                 )
             )
 
-
-            substation_distance = self._number(
+            substation_distance = self._float(
                 getattr(
                     site,
                     "nearest_substation_distance",
-                    0,
+                    None,
                 )
             )
 
-
-            transmission_distance = self._number(
+            transmission_distance = self._float(
                 getattr(
                     site,
                     "nearest_transmission_line_distance",
-                    0,
+                    None,
                 )
             )
 
-
-            water_distance = self._number(
+            water_distance = self._float(
                 getattr(
                     site,
                     "water_body_distance",
-                    0,
+                    None,
                 )
             )
 
-
-            protected_distance = self._number(
+            protected_distance = self._float(
                 getattr(
                     site,
                     "protected_area_distance",
-                    0,
+                    None,
                 )
             )
 
+            # =================================================
+            # GIS ENRICHMENT STATUS
+            # =================================================
 
-            if self._is_enriched(site):
-
+            if self._has_gis_data(site):
                 enriched_sites += 1
 
+            # =================================================
+            # AUTHORITATIVE SITE SUITABILITY
+            # =================================================
 
-            slope_values.append(
-                land_slope
+            suitability = (
+                self.site_suitability_service
+                .evaluate_site(
+                    site_id=site_id,
+                )
             )
 
-            vegetation_values.append(
-                vegetation_index
+            suitability_score = (
+                self._extract_suitability_score(
+                    suitability
+                )
             )
 
-            water_distances.append(
-                water_distance
-            )
-
-            protected_distances.append(
-                protected_distance
-            )
-
-            road_distances.append(
-                road_distance
-            )
-
-            substation_distances.append(
-                substation_distance
-            )
-
-            transmission_distances.append(
-                transmission_distance
-            )
-
+            # =================================================
+            # VISUALIZATION
+            # =================================================
 
             visualization_sites.append(
                 GISVisualizationSite(
                     site_id=site_id,
                     site_name=site_name,
-                    latitude=latitude,
-                    longitude=longitude,
-                    suitability_score=suitability_score,
+                    latitude=(
+                        latitude
+                        if latitude is not None
+                        else 0.0
+                    ),
+                    longitude=(
+                        longitude
+                        if longitude is not None
+                        else 0.0
+                    ),
+                    suitability_score=round(
+                        suitability_score,
+                        2,
+                    ),
                     land_use=land_use,
                 )
             )
 
+            # =================================================
+            # TERRAIN
+            # =================================================
 
             terrain_sites.append(
                 TerrainMapSite(
                     site_id=site_id,
                     site_name=site_name,
-                    latitude=latitude,
-                    longitude=longitude,
-                    land_slope=land_slope,
+                    latitude=(
+                        latitude
+                        if latitude is not None
+                        else 0.0
+                    ),
+                    longitude=(
+                        longitude
+                        if longitude is not None
+                        else 0.0
+                    ),
+                    land_slope=(
+                        round(
+                            land_slope,
+                            2,
+                        )
+                        if land_slope is not None
+                        else 0.0
+                    ),
                 )
             )
 
+            # =================================================
+            # SITE COMPARISON
+            # =================================================
 
             comparison_sites.append(
                 SiteComparisonItem(
                     site_id=site_id,
                     site_name=site_name,
-                    suitability_score=suitability_score,
+
+                    suitability_score=round(
+                        suitability_score,
+                        2,
+                    ),
+
                     land_use=land_use,
-                    land_slope=land_slope,
-                    vegetation_index=vegetation_index,
-                    road_distance=road_distance,
-                    substation_distance=substation_distance,
+
+                    land_slope=(
+                        round(
+                            land_slope,
+                            2,
+                        )
+                        if land_slope is not None
+                        else 0.0
+                    ),
+
+                    vegetation_index=(
+                        round(
+                            vegetation_index,
+                            4,
+                        )
+                        if vegetation_index is not None
+                        else 0.0
+                    ),
+
+                    road_distance=(
+                        round(
+                            road_distance,
+                            2,
+                        )
+                        if road_distance is not None
+                        else 0.0
+                    ),
+
+                    substation_distance=(
+                        round(
+                            substation_distance,
+                            2,
+                        )
+                        if substation_distance is not None
+                        else 0.0
+                    ),
+
                     transmission_line_distance=(
-                        transmission_distance
+                        round(
+                            transmission_distance,
+                            2,
+                        )
+                        if transmission_distance is not None
+                        else 0.0
                     ),
+
                     water_body_distance=(
-                        water_distance
+                        round(
+                            water_distance,
+                            2,
+                        )
+                        if water_distance is not None
+                        else 0.0
                     ),
+
                     protected_area_distance=(
-                        protected_distance
+                        round(
+                            protected_distance,
+                            2,
+                        )
+                        if protected_distance is not None
+                        else 0.0
                     ),
                 )
             )
 
+            # =================================================
+            # ANALYTICS
+            #
+            # IMPORTANT:
+            # None is NOT treated as zero for averages.
+            # =================================================
 
-        environmental = (
+            self._append_if_present(
+                slope_values,
+                land_slope,
+            )
+
+            self._append_if_present(
+                vegetation_values,
+                vegetation_index,
+            )
+
+            self._append_if_present(
+                water_distance_values,
+                water_distance,
+            )
+
+            self._append_if_present(
+                protected_distance_values,
+                protected_distance,
+            )
+
+            self._append_if_present(
+                road_distance_values,
+                road_distance,
+            )
+
+            self._append_if_present(
+                substation_distance_values,
+                substation_distance,
+            )
+
+            self._append_if_present(
+                transmission_distance_values,
+                transmission_distance,
+            )
+
+        # =====================================================
+        # ENVIRONMENTAL ANALYTICS
+        # =====================================================
+
+        environmental_analytics = (
             EnvironmentalAnalytics(
-                average_vegetation_index=(
-                    self._average(
-                        vegetation_values
-                    )
+                average_vegetation_index=self._average(
+                    vegetation_values
                 ),
-                average_water_body_distance=(
-                    self._average(
-                        water_distances
-                    )
+
+                average_water_body_distance=self._average(
+                    water_distance_values
                 ),
-                average_protected_area_distance=(
-                    self._average(
-                        protected_distances
-                    )
+
+                average_protected_area_distance=self._average(
+                    protected_distance_values
                 ),
-                average_road_distance=(
-                    self._average(
-                        road_distances
-                    )
+
+                average_road_distance=self._average(
+                    road_distance_values
                 ),
-                average_substation_distance=(
-                    self._average(
-                        substation_distances
-                    )
+
+                average_substation_distance=self._average(
+                    substation_distance_values
                 ),
-                average_transmission_line_distance=(
-                    self._average(
-                        transmission_distances
-                    )
+
+                average_transmission_line_distance=self._average(
+                    transmission_distance_values
                 ),
             )
         )
 
+        # =====================================================
+        # SUMMARY
+        # =====================================================
 
         summary = GISSummary(
             total_sites=len(sites),
@@ -284,13 +433,14 @@ class GISAnalystDashboardService:
                 slope_values
             ),
 
-            average_vegetation_index=(
-                self._average(
-                    vegetation_values
-                )
+            average_vegetation_index=self._average(
+                vegetation_values
             ),
         )
 
+        # =====================================================
+        # FINAL RESPONSE
+        # =====================================================
 
         return GISAnalystDashboardResponse(
             summary=summary,
@@ -300,7 +450,7 @@ class GISAnalystDashboardService:
             ),
 
             environmental_analytics=(
-                environmental
+                environmental_analytics
             ),
 
             terrain_sites=(
@@ -312,9 +462,74 @@ class GISAnalystDashboardService:
             ),
         )
 
+    # =========================================================
+    # HELPERS
+    # =========================================================
 
     @staticmethod
-    def _number(value) -> float:
+    def _site_name(site) -> str:
+
+        return (
+            getattr(
+                site,
+                "name",
+                None,
+            )
+            or getattr(
+                site,
+                "site_name",
+                None,
+            )
+            or f"Site {site.id}"
+        )
+
+    # ---------------------------------------------------------
+    # Safe float conversion
+    # ---------------------------------------------------------
+
+    @staticmethod
+    def _float(
+        value,
+        default=None,
+    ):
+
+        if value is None:
+            return default
+
+        try:
+            return float(value)
+
+        except (
+            TypeError,
+            ValueError,
+        ):
+            return default
+
+    # ---------------------------------------------------------
+    # Suitability score extraction
+    # ---------------------------------------------------------
+
+    @staticmethod
+    def _extract_suitability_score(
+        suitability,
+    ) -> float:
+
+        if suitability is None:
+            return 0.0
+
+        value = getattr(
+            suitability,
+            "overall_score",
+            None,
+        )
+
+        if value is None and isinstance(
+            suitability,
+            dict,
+        ):
+            value = suitability.get(
+                "overall_score"
+            )
 
         if value is None:
             return 0.0
@@ -328,6 +543,33 @@ class GISAnalystDashboardService:
         ):
             return 0.0
 
+    # ---------------------------------------------------------
+    # Append only real values
+    # ---------------------------------------------------------
+
+    @staticmethod
+    def _append_if_present(
+        values: list[float],
+        value,
+    ) -> None:
+
+        if value is None:
+            return
+
+        try:
+            values.append(
+                float(value)
+            )
+
+        except (
+            TypeError,
+            ValueError,
+        ):
+            return
+
+    # ---------------------------------------------------------
+    # Average
+    # ---------------------------------------------------------
 
     @staticmethod
     def _average(
@@ -338,25 +580,29 @@ class GISAnalystDashboardService:
             return 0.0
 
         return round(
-            sum(values)
-            / len(values),
+            sum(values) / len(values),
             2,
         )
 
+    # ---------------------------------------------------------
+    # GIS enrichment check
+    # ---------------------------------------------------------
 
     @staticmethod
-    def _is_enriched(site) -> bool:
+    def _has_gis_data(site) -> bool:
 
-        fields = [
+        fields = (
             "land_use",
+            "elevation",
             "road_distance",
             "nearest_substation_distance",
             "nearest_transmission_line_distance",
+            "existing_infrastructure",
             "water_body_distance",
             "protected_area_distance",
             "land_slope",
             "vegetation_index",
-        ]
+        )
 
         return any(
             getattr(

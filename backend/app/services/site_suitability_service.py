@@ -1,12 +1,29 @@
+# app/services/site_suitability_service.py
+
+from __future__ import annotations
+
 from sqlalchemy.orm import Session
 
 from app.repositories.suitability_repository import (
     SuitabilityRepository,
 )
+
 from app.schemas.suitability import (
     SiteSuitabilityResponse,
     SuitabilityCategory,
     SuitabilityFactor,
+)
+
+from app.prediction.feature_builder.prediction_feature_builder import (
+    PredictionFeatureBuilder,
+)
+
+from app.prediction.services.prediction_service import (
+    PredictionService,
+)
+
+from app.services.environmental_service import (
+    EnvironmentalService,
 )
 
 
@@ -14,218 +31,544 @@ class SiteSuitabilityService:
     """
     Site Suitability Intelligence Engine.
 
-    Consumes outputs from already implemented:
-        - GIS Intelligence Engine
-        - Environmental Intelligence Engine
-        - Solar Prediction Engine
-        - Wind Prediction Engine
-        - Resource Assessment Engine
+    Flow:
 
-    and converts them into a unified site suitability assessment.
+        Site
+          ↓
+        Environmental Service
+          ↓
+        Prediction Feature Builder
+          ↓
+        Solar / Wind ML Prediction
+          ↓
+        Renewable Resource Scores
+          ↓
+        GIS / Environmental / Economic Scores
+          ↓
+        Weighted Overall Suitability Score
+          ↓
+        Feasibility + Recommendation
+
+    Important:
+    The ML training datasets produce generation values in MW
+    roughly in the 0.00 - 0.13 MW range.
+
+    Therefore the generation-to-suitability thresholds must use
+    the same unit and scale as the trained ML models.
     """
 
-    # Weights defined by the internship specification.
+    # =========================================================
+    # SUITABILITY WEIGHTS
+    # =========================================================
+
     RESOURCE_WEIGHT = 0.35
     GEOGRAPHIC_WEIGHT = 0.25
     INFRASTRUCTURE_WEIGHT = 0.15
     ENVIRONMENTAL_WEIGHT = 0.15
     ECONOMIC_WEIGHT = 0.10
 
-    def __init__(self, db: Session):
+    # =========================================================
+    # ML GENERATION → SUITABILITY
+    #
+    # Training data generation values are approximately:
+    #
+    # Solar: 0.00 - 0.13 MW
+    # Wind : 0.00 - 0.13 MW
+    #
+    # The old thresholds of 0.5 / 1 / 2 / 3 MW were therefore
+    # incorrectly scaled and converted normal ML predictions
+    # into scores around 0-5.
+    # =========================================================
+
+    SOLAR_GENERATION_THRESHOLDS = (
+        (0.00, 0.0),
+        (0.03, 20.0),
+        (0.06, 40.0),
+        (0.09, 70.0),
+        (0.12, 100.0),
+    )
+
+    WIND_GENERATION_THRESHOLDS = (
+        (0.00, 0.0),
+        (0.03, 20.0),
+        (0.06, 40.0),
+        (0.09, 70.0),
+        (0.12, 100.0),
+    )
+
+    def __init__(
+        self,
+        db: Session,
+        environmental_service: EnvironmentalService,
+        prediction_service: PredictionService,
+    ) -> None:
+
         self.repository = SuitabilityRepository(db)
 
-    # ---------------------------------------------------------
-    # Public API
-    # ---------------------------------------------------------
+        self.environmental_service = (
+            environmental_service
+        )
+
+        self.prediction_service = (
+            prediction_service
+        )
+
+    # =========================================================
+    # MAIN
+    # =========================================================
 
     def evaluate_site(
         self,
         site_id: int,
-        intelligence: dict,
     ) -> SiteSuitabilityResponse:
 
-        site_data = self.repository.get_site_intelligence(site_id)
+        # =========================================================
+        # 1. GET SITE
+        # =========================================================
 
-        if not site_data:
-            raise ValueError(f"Site {site_id} not found")
+        site = self.repository.get_site(site_id)
 
-        renewable_data = intelligence.get(
-            "renewable_resource",
+        if site is None:
+            raise ValueError(
+                f"Site {site_id} not found."
+            )
+
+        # =========================================================
+        # 2. GET ENVIRONMENTAL + GIS DATA
+        # =========================================================
+
+        environment = (
+            self.environmental_service.get_site_environment(
+                site_id
+            )
+        )
+
+        # EnvironmentalReport is a Pydantic model.
+        # PredictionFeatureBuilder expects a dictionary.
+        environment_data = self._model_dump(
+            environment
+        )
+
+        # =========================================================
+        # 3. BUILD ML FEATURE REQUESTS
+        # =========================================================
+
+        solar_request = (
+            PredictionFeatureBuilder.build_solar(
+                site=site,
+                environment=environment_data,
+            )
+        )
+
+        wind_request = (
+            PredictionFeatureBuilder.build_wind(
+                site=site,
+                environment=environment_data,
+            )
+        )
+
+        # =========================================================
+        # 4. EXECUTE ML PREDICTION
+        # =========================================================
+
+        prediction = (
+            self.prediction_service.predict_renewable(
+                solar_request=solar_request,
+                wind_request=wind_request,
+            )
+        )
+
+        # =========================================================
+        # 5. CONVERT PREDICTION TO DICTIONARY
+        # =========================================================
+
+        prediction_data = self._model_dump(
+            prediction
+        )
+
+        # =========================================================
+        # 6. EXTRACT SOLAR + WIND GENERATION
+        # =========================================================
+
+        solar_generation = (
+            self._extract_prediction(
+                prediction_data,
+                "solar_generation_mw",
+            )
+        )
+
+        wind_generation = (
+            self._extract_prediction(
+                prediction_data,
+                "wind_generation_mw",
+            )
+        )
+
+        # =========================================================
+        # 7. CONVERT GENERATION TO RESOURCE SCORES
+        # =========================================================
+
+        solar_score = (
+            self._generation_to_suitability(
+                solar_generation,
+                self.SOLAR_GENERATION_THRESHOLDS,
+            )
+        )
+
+        wind_score = (
+            self._generation_to_suitability(
+                wind_generation,
+                self.WIND_GENERATION_THRESHOLDS,
+            )
+        )
+
+        renewable_resource_score = (
+            self._calculate_resource_score(
+                solar_score,
+                wind_score,
+            )
+        )
+
+        # =========================================================
+        # 8. EXTRACT ENVIRONMENTAL / GIS SECTIONS
+        # =========================================================
+
+        gis = environment_data.get(
+            "gis",
             {},
         )
 
-        geographic_data = intelligence.get(
-            "geographic",
+        if gis is None:
+            gis = {}
+
+        weather = environment_data.get(
+            "weather",
             {},
         )
 
-        infrastructure_data = intelligence.get(
-            "infrastructure",
-            {},
+        if weather is None:
+            weather = {}
+
+        # =========================================================
+        # 9. CALCULATE SUITABILITY FACTORS
+        # =========================================================
+
+        geographic_score = (
+            self._calculate_geographic_score(
+                gis
+            )
         )
 
-        environmental_data = intelligence.get(
-            "environmental",
-            {},
+        infrastructure_score = (
+            self._calculate_infrastructure_score(
+                gis
+            )
         )
 
-        economic_data = intelligence.get(
-            "economic",
-            {},
+        environmental_score = (
+            self._calculate_environmental_score(
+                weather,
+                gis,
+            )
         )
 
-        solar_score = self._normalize_score(
-            renewable_data.get("solar_score")
+        economic_score = (
+            self._calculate_economic_score(
+                gis
+            )
         )
 
-        wind_score = self._normalize_score(
-            renewable_data.get("wind_score")
-        )
+        # =========================================================
+        # 10. BUILD FACTOR OBJECTS
+        # =========================================================
 
-        resource_score = self._calculate_resource_score(
-            solar_score=solar_score,
-            wind_score=wind_score,
-        )
-
-        geographic_score = self._normalize_score(
-            geographic_data.get("score")
-        )
-
-        infrastructure_score = self._normalize_score(
-            infrastructure_data.get("score")
-        )
-
-        environmental_score = self._normalize_score(
-            environmental_data.get("score")
-        )
-
-        economic_score = self._normalize_score(
-            economic_data.get("score")
-        )
-
-        factors = {
-            "renewable_resource": self._factor(
-                resource_score,
-                self.RESOURCE_WEIGHT,
-                "Renewable resource availability",
+        renewable_resource = self._build_factor(
+            score=renewable_resource_score,
+            weight=self.RESOURCE_WEIGHT,
+            explanation=(
+                "Renewable resource suitability derived "
+                "from solar and wind ML generation predictions."
             ),
-            "geographic_suitability": self._factor(
-                geographic_score,
-                self.GEOGRAPHIC_WEIGHT,
-                "Geographic and terrain suitability",
+        )
+
+        geographic_suitability = self._build_factor(
+            score=geographic_score,
+            weight=self.GEOGRAPHIC_WEIGHT,
+            explanation=(
+                "Geographic and terrain suitability."
             ),
-            "infrastructure_accessibility": self._factor(
-                infrastructure_score,
-                self.INFRASTRUCTURE_WEIGHT,
-                "Infrastructure accessibility",
+        )
+
+        infrastructure_accessibility = self._build_factor(
+            score=infrastructure_score,
+            weight=self.INFRASTRUCTURE_WEIGHT,
+            explanation=(
+                "Infrastructure accessibility."
             ),
-            "environmental_impact": self._factor(
-                environmental_score,
-                self.ENVIRONMENTAL_WEIGHT,
-                "Environmental constraints",
+        )
+
+        environmental_impact = self._build_factor(
+            score=environmental_score,
+            weight=self.ENVIRONMENTAL_WEIGHT,
+            explanation=(
+                "Environmental constraints."
             ),
-            "economic_feasibility": self._factor(
-                economic_score,
-                self.ECONOMIC_WEIGHT,
-                "Economic viability",
+        )
+
+        economic_feasibility = self._build_factor(
+            score=economic_score,
+            weight=self.ECONOMIC_WEIGHT,
+            explanation=(
+                "Economic feasibility."
             ),
-        }
+        )
+
+        # =========================================================
+        # 11. CALCULATE OVERALL WEIGHTED SCORE
+        # =========================================================
 
         overall_score = round(
-            sum(
-                factor.weighted_score
-                for factor in factors.values()
-            ),
+            renewable_resource.weighted_score
+            + geographic_suitability.weighted_score
+            + infrastructure_accessibility.weighted_score
+            + environmental_impact.weighted_score
+            + economic_feasibility.weighted_score,
             2,
         )
 
-        category = self._get_category(overall_score)
+        # =========================================================
+        # 12. CATEGORY
+        # =========================================================
+
+        category = self._get_category(
+            overall_score
+        )
+
+        # =========================================================
+        # 13. DEPLOYMENT FEASIBILITY
+        # =========================================================
 
         deployment_feasible = (
-            category != SuitabilityCategory.UNSUITABLE
+            self._is_deployment_feasible(
+                overall_score=overall_score,
+                environmental_score=environmental_score,
+                geographic_score=geographic_score,
+            )
         )
 
-        strengths = self._identify_strengths(factors)
+        # =========================================================
+        # 14. STRENGTHS
+        # =========================================================
 
-        constraints = self._identify_constraints(factors)
-
-        recommendation = self._generate_recommendation(
-            category=category,
-            solar_score=solar_score,
-            wind_score=wind_score,
-            constraints=constraints,
+        strengths = self._build_strengths(
+            renewable_resource_score,
+            geographic_score,
+            infrastructure_score,
+            environmental_score,
+            economic_score,
         )
+
+        # =========================================================
+        # 15. CONSTRAINTS
+        # =========================================================
+
+        constraints = self._build_constraints(
+            renewable_resource_score,
+            geographic_score,
+            infrastructure_score,
+            environmental_score,
+            economic_score,
+        )
+
+        # =========================================================
+        # 16. RECOMMENDATION
+        # =========================================================
+
+        recommendation = (
+            self._build_recommendation(
+                overall_score=overall_score,
+                category=category,
+                deployment_feasible=deployment_feasible,
+            )
+        )
+
+        # =========================================================
+        # 17. RESPONSE
+        # =========================================================
 
         return SiteSuitabilityResponse(
             site_id=site_id,
+
             overall_score=overall_score,
+
             category=category,
 
-            renewable_resource=factors[
-                "renewable_resource"
-            ],
+            renewable_resource=renewable_resource,
 
-            geographic_suitability=factors[
-                "geographic_suitability"
-            ],
+            geographic_suitability=(
+                geographic_suitability
+            ),
 
-            infrastructure_accessibility=factors[
-                "infrastructure_accessibility"
-            ],
+            infrastructure_accessibility=(
+                infrastructure_accessibility
+            ),
 
-            environmental_impact=factors[
-                "environmental_impact"
-            ],
+            environmental_impact=(
+                environmental_impact
+            ),
 
-            economic_feasibility=factors[
-                "economic_feasibility"
-            ],
+            economic_feasibility=(
+                economic_feasibility
+            ),
 
-            deployment_feasible=deployment_feasible,
+            deployment_feasible=(
+                deployment_feasible
+            ),
 
             recommendation=recommendation,
 
             strengths=strengths,
+
             constraints=constraints,
 
             solar_score=solar_score,
+
             wind_score=wind_score,
         )
-
-    # ---------------------------------------------------------
-    # Score calculations
-    # ---------------------------------------------------------
+        
+    # =========================================================
+    # PREDICTION EXTRACTION
+    # =========================================================
 
     @staticmethod
-    def _normalize_score(value) -> float:
-        """
-        Convert an incoming score to a safe 0-100 range.
-        """
+    def _extract_prediction(
+        prediction: dict,
+        key: str,
+    ) -> float:
 
-        if value is None:
-            return 0.0
+        value = prediction.get(key)
 
-        try:
-            value = float(value)
-        except (TypeError, ValueError):
-            return 0.0
+        if value is not None:
+            return SiteSuitabilityService._normalize_number(
+                value
+            )
 
-        return round(
-            max(0.0, min(100.0, value)),
-            2,
+        for section in (
+            "solar",
+            "wind",
+            "prediction",
+            "predictions",
+        ):
+
+            nested = prediction.get(
+                section
+            )
+
+            if isinstance(nested, dict):
+
+                value = nested.get(key)
+
+                if value is not None:
+                    return (
+                        SiteSuitabilityService
+                        ._normalize_number(value)
+                    )
+
+                value = nested.get(
+                    "generation_mw"
+                )
+
+                if value is not None:
+                    return (
+                        SiteSuitabilityService
+                        ._normalize_number(value)
+                    )
+
+        return 0.0
+
+    # =========================================================
+    # GENERATION → SUITABILITY
+    # =========================================================
+
+    @staticmethod
+    def _generation_to_suitability(
+        generation: float,
+        thresholds: tuple,
+    ) -> float:
+
+        generation = max(
+            0.0,
+            float(generation),
         )
+
+        previous_generation = (
+            thresholds[0][0]
+        )
+
+        previous_score = (
+            thresholds[0][1]
+        )
+
+        for (
+            current_generation,
+            current_score,
+        ) in thresholds[1:]:
+
+            if generation <= current_generation:
+
+                if (
+                    current_generation
+                    == previous_generation
+                ):
+                    return current_score
+
+                ratio = (
+                    generation
+                    - previous_generation
+                ) / (
+                    current_generation
+                    - previous_generation
+                )
+
+                score = (
+                    previous_score
+                    + ratio
+                    * (
+                        current_score
+                        - previous_score
+                    )
+                )
+
+                return round(
+                    max(
+                        0.0,
+                        min(
+                            100.0,
+                            score,
+                        ),
+                    ),
+                    2,
+                )
+
+            previous_generation = (
+                current_generation
+            )
+
+            previous_score = (
+                current_score
+            )
+
+        return 100.0
+
+    # =========================================================
+    # RESOURCE SCORE
+    # =========================================================
 
     @staticmethod
     def _calculate_resource_score(
         solar_score: float,
         wind_score: float,
     ) -> float:
-        """
-        Combine existing solar and wind resource scores.
-
-        The actual solar/wind prediction logic remains in the
-        existing prediction engines.
-        """
 
         scores = [
             score
@@ -239,45 +582,75 @@ class SiteSuitabilityService:
         if not scores:
             return 0.0
 
-        return round(sum(scores) / len(scores), 2)
+        return round(
+            sum(scores) / len(scores),
+            2,
+        )
 
-    @staticmethod
-    def _factor(
+    # =========================================================
+    # FACTOR
+    # =========================================================
+
+    def _build_factor(
+        self,
         score: float,
         weight: float,
         explanation: str,
     ) -> SuitabilityFactor:
 
-        weighted_score = score * weight
-
-        return SuitabilityFactor(
-            score=round(score, 2),
-            weight=weight,
-            weighted_score=round(weighted_score, 2),
-            status=SiteSuitabilityService._score_status(score),
-            explanation=explanation,
+        score = max(
+            0.0,
+            min(100.0, float(score)),
         )
 
-    @staticmethod
-    def _score_status(score: float) -> str:
+        weight = max(
+            0.0,
+            min(1.0, float(weight)),
+        )
+
+        weighted_score = (
+            score * weight
+        )
 
         if score >= 80:
-            return "Excellent"
+            factor_status = "Excellent"
 
-        if score >= 65:
-            return "Good"
+        elif score >= 60:
+            factor_status = "Good"
 
-        if score >= 50:
-            return "Moderate"
+        elif score >= 40:
+            factor_status = "Moderate"
 
-        if score >= 30:
-            return "Low"
+        elif score >= 20:
+            factor_status = "Low"
 
-        return "Poor"
+        else:
+            factor_status = "Very Low"
 
-    # ---------------------------------------------------------
-    # Suitability classification
-    # ---------------------------------------------------------
+        return SuitabilityFactor(
+            score=round(
+                score,
+                2,
+            ),
+
+            weight=round(
+                weight,
+                4,
+            ),
+
+            weighted_score=round(
+                weighted_score,
+                2,
+            ),
+
+            status=factor_status,
+
+            explanation=explanation,
+        )
+    
+    # =========================================================
+    # CATEGORY
+    # =========================================================
 
     @staticmethod
     def _get_category(
@@ -298,97 +671,418 @@ class SiteSuitabilityService:
 
         return SuitabilityCategory.UNSUITABLE
 
-    # ---------------------------------------------------------
-    # Strengths / constraints
-    # ---------------------------------------------------------
+    # =========================================================
+    # DEPLOYMENT FEASIBILITY
+    # =========================================================
 
     @staticmethod
-    def _identify_strengths(
-        factors: dict,
+    def _is_deployment_feasible(
+        overall_score: float,
+        environmental_score: float,
+        geographic_score: float,
+    ) -> bool:
+
+        return (
+            overall_score >= 50
+            and environmental_score >= 30
+            and geographic_score >= 30
+        )
+
+    # =========================================================
+    # GEOGRAPHIC
+    # =========================================================
+
+    @staticmethod
+    def _calculate_geographic_score(
+        gis: dict,
+    ) -> float:
+
+        if not gis:
+            return 50.0
+
+        score = 50.0
+
+        elevation = (
+            gis.get("elevation_m")
+        )
+
+        if elevation is not None:
+
+            try:
+                elevation = float(
+                    elevation
+                )
+
+                if 0 <= elevation <= 2000:
+                    score += 20
+
+                elif elevation <= 3000:
+                    score += 10
+
+                else:
+                    score -= 10
+
+            except (
+                TypeError,
+                ValueError,
+            ):
+                pass
+
+        slope = gis.get(
+            "slope"
+        )
+
+        if slope is None:
+            slope = gis.get(
+                "slope_degrees"
+            )
+
+        if slope is not None:
+
+            try:
+                slope = float(
+                    slope
+                )
+
+                if slope <= 5:
+                    score += 20
+
+                elif slope <= 15:
+                    score += 10
+
+                elif slope > 30:
+                    score -= 20
+
+            except (
+                TypeError,
+                ValueError,
+            ):
+                pass
+
+        return round(
+            max(
+                0.0,
+                min(
+                    100.0,
+                    score,
+                ),
+            ),
+            2,
+        )
+
+    # =========================================================
+    # INFRASTRUCTURE
+    # =========================================================
+
+    @staticmethod
+    def _calculate_infrastructure_score(
+        gis: dict,
+    ) -> float:
+
+        if not gis:
+            return 50.0
+
+        score = 50.0
+
+        for key in (
+            "road_distance_km",
+            "transmission_distance_km",
+            "substation_distance_km",
+        ):
+
+            value = gis.get(key)
+
+            if value is None:
+                continue
+
+            try:
+                distance = float(
+                    value
+                )
+
+                if distance <= 5:
+                    score += 15
+
+                elif distance <= 15:
+                    score += 5
+
+                elif distance > 50:
+                    score -= 15
+
+            except (
+                TypeError,
+                ValueError,
+            ):
+                continue
+
+        return round(
+            max(
+                0.0,
+                min(
+                    100.0,
+                    score,
+                ),
+            ),
+            2,
+        )
+
+    # =========================================================
+    # ENVIRONMENTAL
+    # =========================================================
+
+    @staticmethod
+    def _calculate_environmental_score(
+        weather: dict,
+        gis: dict,
+    ) -> float:
+
+        score = 70.0
+
+        cloud_cover = weather.get(
+            "cloud_cover"
+        )
+
+        if cloud_cover is not None:
+
+            try:
+                cloud_cover = float(
+                    cloud_cover
+                )
+
+                if cloud_cover > 80:
+                    score -= 15
+
+                elif cloud_cover > 60:
+                    score -= 5
+
+            except (
+                TypeError,
+                ValueError,
+            ):
+                pass
+
+        rainfall = weather.get(
+            "rainfall"
+        )
+
+        if rainfall is not None:
+
+            try:
+                rainfall = float(
+                    rainfall
+                )
+
+                if rainfall > 20:
+                    score -= 10
+
+            except (
+                TypeError,
+                ValueError,
+            ):
+                pass
+
+        return round(
+            max(
+                0.0,
+                min(
+                    100.0,
+                    score,
+                ),
+            ),
+            2,
+        )
+
+    # =========================================================
+    # ECONOMIC
+    # =========================================================
+
+    @staticmethod
+    def _calculate_economic_score(
+        gis: dict,
+    ) -> float:
+
+        # Economic feasibility is kept neutral until
+        # validated CAPEX / OPEX / tariff data is available.
+        return 50.0
+
+    # =========================================================
+    # STRENGTHS
+    # =========================================================
+
+    @staticmethod
+    def _build_strengths(
+        renewable_resource_score: float,
+        geographic_score: float,
+        infrastructure_score: float,
+        environmental_score: float,
+        economic_score: float,
     ) -> list[str]:
 
         strengths = []
 
-        for name, factor in factors.items():
+        if renewable_resource_score >= 70:
+            strengths.append(
+                "Strong renewable resource potential."
+            )
 
-            if factor.score >= 70:
+        if geographic_score >= 70:
+            strengths.append(
+                "Geographic and terrain conditions are favorable."
+            )
 
-                readable_name = name.replace(
-                    "_",
-                    " ",
-                ).title()
+        if infrastructure_score >= 70:
+            strengths.append(
+                "Good infrastructure accessibility."
+            )
 
-                strengths.append(
-                    f"{readable_name} is favorable."
-                )
+        if environmental_score >= 70:
+            strengths.append(
+                "Environmental conditions are relatively favorable."
+            )
+
+        if economic_score >= 70:
+            strengths.append(
+                "Economic feasibility indicators are favorable."
+            )
 
         return strengths
 
+    # =========================================================
+    # CONSTRAINTS
+    # =========================================================
+
     @staticmethod
-    def _identify_constraints(
-        factors: dict,
+    def _build_constraints(
+        renewable_resource_score: float,
+        geographic_score: float,
+        infrastructure_score: float,
+        environmental_score: float,
+        economic_score: float,
     ) -> list[str]:
 
         constraints = []
 
-        for name, factor in factors.items():
+        if renewable_resource_score < 50:
+            constraints.append(
+                "Renewable resource potential is relatively low."
+            )
 
-            if factor.score < 50:
+        if geographic_score < 50:
+            constraints.append(
+                "Geographic or terrain suitability is limited."
+            )
 
-                readable_name = name.replace(
-                    "_",
-                    " ",
-                ).title()
+        if infrastructure_score < 50:
+            constraints.append(
+                "Infrastructure accessibility may require improvement."
+            )
 
-                constraints.append(
-                    f"{readable_name} requires attention."
-                )
+        if environmental_score < 50:
+            constraints.append(
+                "Environmental conditions require additional assessment."
+            )
+
+        if economic_score < 50:
+            constraints.append(
+                "Economic feasibility requires further validation."
+            )
 
         return constraints
 
-    # ---------------------------------------------------------
-    # Recommendation
-    # ---------------------------------------------------------
+    # =========================================================
+    # RECOMMENDATION
+    # =========================================================
 
     @staticmethod
-    def _generate_recommendation(
+    def _build_recommendation(
+        overall_score: float,
         category: SuitabilityCategory,
-        solar_score: float,
-        wind_score: float,
-        constraints: list[str],
+        deployment_feasible: bool,
     ) -> str:
 
-        if category == SuitabilityCategory.UNSUITABLE:
+        if not deployment_feasible:
             return (
-                "The site is currently unsuitable for "
+                "The site does not currently meet "
+                "the required deployment feasibility criteria."
+            )
+
+        if category == SuitabilityCategory.EXCELLENT:
+            return (
+                "The site is highly suitable for "
                 "renewable energy deployment."
             )
 
-        if solar_score >= 70 and wind_score >= 70:
+        if category == SuitabilityCategory.HIGHLY_SUITABLE:
             return (
-                "The site shows strong potential for "
-                "hybrid solar-wind deployment."
+                "The site is highly suitable for "
+                "renewable energy deployment."
             )
 
-        if solar_score >= 70:
+        if category == SuitabilityCategory.MODERATELY_SUITABLE:
             return (
-                "The site shows strong potential for "
-                "solar energy deployment."
+                "The site is moderately suitable and "
+                "requires detailed feasibility validation."
             )
 
-        if wind_score >= 70:
+        if category == SuitabilityCategory.LOW_SUITABILITY:
             return (
-                "The site shows strong potential for "
-                "wind energy deployment."
-            )
-
-        if constraints:
-            return (
-                "The site may be suitable for deployment "
-                "subject to the identified constraints."
+                "The site has limited renewable deployment "
+                "suitability and requires further analysis."
             )
 
         return (
-            "The site is potentially suitable for "
+            "The site is currently unsuitable for "
             "renewable energy deployment."
         )
+
+    # =========================================================
+    # HELPERS
+    # =========================================================
+
+    @staticmethod
+    def _normalize_number(
+        value,
+    ) -> float:
+
+        if value is None:
+            return 0.0
+
+        try:
+            return max(
+                0.0,
+                float(value),
+            )
+
+        except (
+            TypeError,
+            ValueError,
+        ):
+            return 0.0
+
+    @staticmethod
+    def _model_dump(
+        value,
+    ) -> dict:
+
+        if value is None:
+            return {}
+
+        if isinstance(
+            value,
+            dict,
+        ):
+            return value
+
+        if hasattr(
+            value,
+            "model_dump",
+        ):
+            return value.model_dump()
+
+        if hasattr(
+            value,
+            "dict",
+        ):
+            return value.dict()
+
+        return {}

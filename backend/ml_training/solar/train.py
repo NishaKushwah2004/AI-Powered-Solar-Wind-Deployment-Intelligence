@@ -1,7 +1,7 @@
 """
-Solar ML training pipeline.
+Train Solar ML model using OBSERVED DATA ONLY.
 
-Run from backend root:
+Run:
 
     python -m ml_training.solar.train
 """
@@ -16,32 +16,26 @@ import joblib
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.model_selection import train_test_split
 
-from ml_core.preprocessing import (
-    NumericImputer,
-    NumericScaler,
-    PreprocessingPipeline,
-)
-
+from ml_core.preprocessing import PreprocessingPipeline
 from ml_training.solar.config import (
-    ARTIFACT_DIR,
-    EVALUATION_DIR,
+    DATASET_PATH,
+    DATA_SOURCE,
+    DATASET_TYPE,
     FEATURES,
+    TARGET,
+    SCHEMA_VERSION,
+    MODEL_PATH,
+    PREPROCESSOR_PATH,
     METADATA_PATH,
     METRICS_PATH,
-    MODEL_DIR,
-    MODEL_PARAMS,
-    MODEL_PATH,
-    PREPROCESSING_DIR,
-    PREPROCESSOR_PATH,
-    RANDOM_STATE,
-    SCHEMA_VERSION,
-    TARGET,
     TEST_SIZE,
+    RANDOM_STATE,
+    MODEL_PARAMS,
+    validate_config,
 )
 
 from ml_training.solar.data_loader import (
-    load_solar_dataset,
-    prepare_solar_training_data,
+    load_solar_observed_data,
 )
 
 from ml_training.solar.evaluate import (
@@ -51,59 +45,63 @@ from ml_training.solar.evaluate import (
 )
 
 
-def create_artifact_directories() -> None:
-    """Create all Solar artifact directories."""
+DOMAIN = "solar"
 
-    for directory in [
-        ARTIFACT_DIR,
-        MODEL_DIR,
-        PREPROCESSING_DIR,
-        EVALUATION_DIR,
-        METADATA_PATH.parent,
-    ]:
-        directory.mkdir(
-            parents=True,
-            exist_ok=True,
+
+def train():
+
+    print("=" * 70)
+    print("SOLAR MODEL TRAINING - OBSERVED DATA ONLY")
+    print("=" * 70)
+
+    # ---------------------------------------------------------
+    # 1. Configuration
+    # ---------------------------------------------------------
+
+    print("\n[1/7] Validating configuration...")
+
+    validate_config()
+
+    # ---------------------------------------------------------
+    # 2. Load observed dataset
+    # ---------------------------------------------------------
+
+    print("\n[2/7] Loading observed dataset...")
+
+    dataframe = load_solar_observed_data(
+        DATASET_PATH
+    )
+
+    print(
+        f"Observed rows: {len(dataframe)}"
+    )
+
+    # ---------------------------------------------------------
+    # 3. Prepare features and target
+    # ---------------------------------------------------------
+
+    print(
+        "\n[3/7] Preparing features and target..."
+    )
+
+    from ml_core.preprocessing.feature_preparation import (
+        prepare_training_data,
+    )
+
+    X, y = prepare_training_data(
+        dataframe,
+        DOMAIN,
+    )
+
+    if list(X.columns) != FEATURES:
+        raise ValueError(
+            "Solar feature ordering mismatch."
         )
 
-
-def train() -> dict:
-    """
-    Complete Solar training pipeline.
-    """
-
-    print("\n" + "=" * 60)
-    print("SOLAR ML TRAINING")
-    print("=" * 60)
-
-    create_artifact_directories()
-
-    # ---------------------------------------------------------
-    # 1. Load dataset
-    # ---------------------------------------------------------
-
-    print("\n[1/6] Loading dataset...")
-
-    dataframe = load_solar_dataset()
+    y.name = TARGET
 
     print(
-        f"Loaded {len(dataframe)} rows."
-    )
-
-    # ---------------------------------------------------------
-    # 2. Prepare X/y
-    # ---------------------------------------------------------
-
-    print(
-        "\n[2/6] Preparing features and target..."
-    )
-
-    X, y = prepare_solar_training_data(
-        dataframe
-    )
-
-    print(
-        f"Features: {len(FEATURES)}"
+        f"Features: {FEATURES}"
     )
 
     print(
@@ -111,18 +109,20 @@ def train() -> dict:
     )
 
     # ---------------------------------------------------------
-    # 3. Train/test split
+    # 4. Train/test split
     # ---------------------------------------------------------
 
     print(
-        "\n[3/6] Splitting dataset..."
+        "\n[4/7] Splitting observed dataset..."
     )
 
-    X_train, X_test, y_train, y_test = train_test_split(
-        X,
-        y,
-        test_size=TEST_SIZE,
-        random_state=RANDOM_STATE,
+    X_train, X_test, y_train, y_test = (
+        train_test_split(
+            X,
+            y,
+            test_size=TEST_SIZE,
+            random_state=RANDOM_STATE,
+        )
     )
 
     print(
@@ -134,11 +134,11 @@ def train() -> dict:
     )
 
     # ---------------------------------------------------------
-    # 4. Preprocessing
+    # 5. Preprocessing
     # ---------------------------------------------------------
 
     print(
-        "\n[4/6] Fitting preprocessing pipeline..."
+        "\n[5/7] Fitting preprocessing..."
     )
 
     preprocessor = PreprocessingPipeline(
@@ -158,11 +158,11 @@ def train() -> dict:
     )
 
     # ---------------------------------------------------------
-    # 5. Train model
+    # 6. Train and evaluate
     # ---------------------------------------------------------
 
     print(
-        "\n[5/6] Training Random Forest..."
+        "\n[6/7] Training Solar Random Forest..."
     )
 
     model = RandomForestRegressor(
@@ -174,12 +174,8 @@ def train() -> dict:
         y_train,
     )
 
-    # ---------------------------------------------------------
-    # 6. Evaluate
-    # ---------------------------------------------------------
-
     print(
-        "\n[6/6] Evaluating model..."
+        "\nEvaluating on held-out observed data..."
     )
 
     metrics = evaluate_model(
@@ -188,69 +184,79 @@ def train() -> dict:
         y_test,
     )
 
-    print_metrics(
-        metrics
-    )
+    print_metrics(metrics)
 
     # ---------------------------------------------------------
-    # Save model
+    # 7. Save artifacts
     # ---------------------------------------------------------
+
+    print(
+        "\n[7/7] Saving production artifacts..."
+    )
+
+    MODEL_PATH.parent.mkdir(
+        parents=True,
+        exist_ok=True,
+    )
+
+    PREPROCESSOR_PATH.parent.mkdir(
+        parents=True,
+        exist_ok=True,
+    )
+
+    METADATA_PATH.parent.mkdir(
+        parents=True,
+        exist_ok=True,
+    )
+
+    METRICS_PATH.parent.mkdir(
+        parents=True,
+        exist_ok=True,
+    )
 
     joblib.dump(
         model,
         MODEL_PATH,
     )
 
-    print(
-        f"\nModel saved:\n{MODEL_PATH}"
-    )
-
-    # ---------------------------------------------------------
-    # Save preprocessor
-    # ---------------------------------------------------------
-
     joblib.dump(
         preprocessor,
         PREPROCESSOR_PATH,
     )
-
-    print(
-        f"Preprocessor saved:\n"
-        f"{PREPROCESSOR_PATH}"
-    )
-
-    # ---------------------------------------------------------
-    # Save metrics
-    # ---------------------------------------------------------
 
     save_metrics(
         metrics,
         METRICS_PATH,
     )
 
-    # ---------------------------------------------------------
-    # Save metadata
-    # ---------------------------------------------------------
-
     metadata = {
-        "domain": "solar",
+        "domain": DOMAIN,
         "schema_version": SCHEMA_VERSION,
         "model_type": "RandomForestRegressor",
         "model_version": "1.0.0",
+
         "features": FEATURES,
         "feature_count": len(FEATURES),
         "target": TARGET,
         "target_unit": "MW",
-        "data_source": "synthetic_reference",
-        "dataset_type": "reference",
+
+        "data_source": DATA_SOURCE,
+        "dataset_type": DATASET_TYPE,
+        "dataset": DATASET_PATH.name,
+
         "training_rows": len(X_train),
         "testing_rows": len(X_test),
+        "total_rows": len(dataframe),
+
         "test_size": TEST_SIZE,
         "random_state": RANDOM_STATE,
+
         "metrics": metrics,
+
         "trained_at": datetime.now(
             timezone.utc
         ).isoformat(),
+
         "preprocessing": (
             preprocessor.get_metadata()
         ),
@@ -267,14 +273,16 @@ def train() -> dict:
             indent=2,
         )
 
-    print(
-        f"Metadata saved:\n"
-        f"{METADATA_PATH}"
-    )
+    print("\n" + "=" * 70)
+    print("SOLAR TRAINING COMPLETED")
+    print("=" * 70)
 
-    print(
-        "\nSolar training completed successfully."
-    )
+    print(f"\nModel: {MODEL_PATH}")
+    print(f"Preprocessor: {PREPROCESSOR_PATH}")
+    print(f"Metrics: {METRICS_PATH}")
+    print(f"Metadata: {METADATA_PATH}")
+
+    print("\nData source: OBSERVED")
 
     return metrics
 
