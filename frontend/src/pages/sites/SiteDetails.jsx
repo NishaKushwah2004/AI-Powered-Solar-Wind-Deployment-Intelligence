@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import toast from "react-hot-toast";
-import { ArrowLeft, Pencil, Trash2, Sparkles } from "lucide-react";
+import { ArrowLeft, Pencil, Trash2, Sparkles, Leaf } from "lucide-react";
 import PageHeader from "../../components/ui/PageHeader.jsx";
 import Button from "../../components/ui/Button.jsx";
 import Badge from "../../components/ui/Badge.jsx";
@@ -78,6 +78,11 @@ export default function SiteDetails() {
                 </Button>
               </Link>
             )}
+            <Link to={`/environment?site_id=${siteId}`}>
+              <Button variant="secondary" size="sm">
+                <Leaf className="h-4 w-4" /> Environmental analysis
+              </Button>
+            </Link>
             {canEdit && (
               <Link to={`/sites/${siteId}/edit`}>
                 <Button variant="secondary" size="sm">

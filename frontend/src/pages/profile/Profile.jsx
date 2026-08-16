@@ -163,12 +163,20 @@ export default function Profile() {
               >
                 <Input
                   label="Full name"
+                  autoFocus
                   error={errors.full_name?.message}
                   {...register("full_name")}
                 />
-                <Input label="Email" value={profile.email} disabled readOnly />
+                <Input
+                  label="Email"
+                  hint="Email cannot be changed"
+                  value={profile.email}
+                  disabled
+                  readOnly
+                />
                 <Input
                   label="Role"
+                  hint="Role cannot be changed here"
                   value={profile.role?.name || ""}
                   disabled
                   readOnly

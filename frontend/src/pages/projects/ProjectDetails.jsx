@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import toast from "react-hot-toast";
-import { ArrowLeft, Pencil, Trash2, Plus, MapPinned } from "lucide-react";
+import { ArrowLeft, Pencil, Trash2, Plus, MapPinned, Leaf } from "lucide-react";
 import PageHeader from "../../components/ui/PageHeader.jsx";
 import Button from "../../components/ui/Button.jsx";
 import Badge from "../../components/ui/Badge.jsx";
@@ -80,6 +80,11 @@ export default function ProjectDetails() {
         description={project.description || "No description provided."}
         actions={
           <>
+            <Link to={`/environment?project_id=${projectId}`}>
+              <Button variant="secondary" size="sm">
+                <Leaf className="h-4 w-4" /> Environmental analysis
+              </Button>
+            </Link>
             {canEdit && (
               <Link to={`/projects/${projectId}/edit`}>
                 <Button variant="secondary" size="sm">

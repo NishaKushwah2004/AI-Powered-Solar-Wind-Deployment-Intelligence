@@ -4,8 +4,10 @@ import {
   FolderKanban,
   MapPinned,
   Globe2,
+  Leaf,
   FileBarChart2,
   Bell,
+  ShieldCheck,
   Sun,
   X,
 } from "lucide-react";
@@ -34,12 +36,24 @@ const NAV_ITEMS = [
     roles: [ROLES.ADMIN, ROLES.GIS_ANALYST, ROLES.PROJECT_MANAGER, ROLES.RENEWABLE_ENERGY_PLANNER],
   },
   {
+    to: "/environment",
+    label: "Environmental Analysis",
+    icon: Leaf,
+    roles: [ROLES.ADMIN, ROLES.GIS_ANALYST, ROLES.PROJECT_MANAGER, ROLES.RENEWABLE_ENERGY_PLANNER],
+  },
+  {
     to: "/reports",
     label: "Reports",
     icon: FileBarChart2,
     roles: [ROLES.ADMIN, ROLES.RENEWABLE_ENERGY_PLANNER, ROLES.PROJECT_MANAGER, ROLES.GIS_ANALYST],
   },
   { to: "/notifications", label: "Notifications", icon: Bell, roles: null },
+  {
+    to: "/admin",
+    label: "Admin",
+    icon: ShieldCheck,
+    roles: [ROLES.ADMIN],
+  },
 ];
 
 export default function Sidebar({ mobileOpen, onCloseMobile }) {

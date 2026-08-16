@@ -9,6 +9,7 @@ import Login from "../pages/auth/Login.jsx";
 import Register from "../pages/auth/Register.jsx";
 import Dashboard from "../pages/dashboard/Dashboard.jsx";
 import Profile from "../pages/profile/Profile.jsx";
+import AdminDashboard from "../pages/admin/AdminDashboard.jsx";
 
 import Projects from "../pages/projects/Projects.jsx";
 import ProjectDetails from "../pages/projects/ProjectDetails.jsx";
@@ -20,6 +21,7 @@ import SiteForm from "../pages/sites/SiteForm.jsx";
 
 import GISAnalyst from "../pages/gis/GISAnalyst.jsx";
 import RenewableIntelligence from "../pages/intelligence/RenewableIntelligence.jsx";
+import Environment from "../pages/environment/Environment.jsx";
 import Reports from "../pages/reports/Reports.jsx";
 import Notifications from "../pages/notifications/Notifications.jsx";
 
@@ -94,6 +96,28 @@ export default function AppRouter() {
           >
             <Route path="/gis" element={<GISAnalyst />} />
             <Route path="/intelligence" element={<RenewableIntelligence />} />
+          </Route>
+
+          {/* Environmental Analysis: Admin, GIS Analyst, Project Manager, Planner
+              (matches backend require_roles on /environment/sites and /environment/projects) */}
+          <Route
+            element={
+              <RoleGuard
+                allow={[
+                  ROLES.ADMIN,
+                  ROLES.GIS_ANALYST,
+                  ROLES.PROJECT_MANAGER,
+                  ROLES.RENEWABLE_ENERGY_PLANNER,
+                ]}
+              />
+            }
+          >
+            <Route path="/environment" element={<Environment />} />
+          </Route>
+
+          {/* Admin: Admin only (matches backend require_roles on /auth/admin) */}
+          <Route element={<RoleGuard allow={[ROLES.ADMIN]} />}>
+            <Route path="/admin" element={<AdminDashboard />} />
           </Route>
 
           {/* Reports: Admin, Planner, Project Manager, GIS Analyst */}

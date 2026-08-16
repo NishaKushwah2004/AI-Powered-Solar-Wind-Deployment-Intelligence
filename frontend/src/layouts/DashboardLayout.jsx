@@ -9,8 +9,11 @@ const TITLES = {
   "/sites": "Sites",
   "/gis": "GIS Analysis",
   "/intelligence": "Renewable Intelligence",
+  "/environment": "Environmental Analysis",
   "/reports": "Reports",
   "/notifications": "Notifications",
+  "/profile": "Profile",
+  "/admin": "Admin Dashboard",
 };
 
 function resolveTitle(pathname) {

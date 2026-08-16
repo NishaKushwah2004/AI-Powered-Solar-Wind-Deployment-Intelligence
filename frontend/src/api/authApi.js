@@ -11,3 +11,7 @@ export const login = (payload) =>
 // GET /auth/me -> UserResponse { id, full_name, email, is_active, role }
 export const getCurrentUser = () =>
   axiosClient.get("/auth/me").then((r) => r.data);
+
+// GET /auth/admin  (Admin only) -> { message, user, role }
+export const getAdminDashboard = () =>
+  axiosClient.get("/auth/admin").then((r) => r.data);
