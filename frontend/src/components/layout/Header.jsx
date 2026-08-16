@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from "react";
-import { Menu, Bell, LogOut, User } from "lucide-react";
+import { Link } from "react-router-dom";
+import { Menu, Bell, LogOut, User, UserCircle } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "../../hooks/useAuth.js";
 import { getMyNotifications } from "../../api/notificationApi.js";
@@ -82,6 +83,15 @@ export default function Header({ title, onOpenMobileMenu }) {
                   </Badge>
                 )}
               </div>
+              <div className="my-1 h-px bg-border" />
+              <Link
+                to="/profile"
+                onClick={() => setMenuOpen(false)}
+                className="flex w-full items-center gap-2 rounded-md px-2.5 py-2 text-sm text-ink hover:bg-surface-muted"
+              >
+                <UserCircle className="h-4 w-4" />
+                Profile
+              </Link>
               <div className="my-1 h-px bg-border" />
               <button
                 onClick={() => logout()}

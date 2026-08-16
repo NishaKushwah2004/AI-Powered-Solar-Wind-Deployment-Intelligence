@@ -6,7 +6,9 @@ import ProtectedRoute from "./ProtectedRoute.jsx";
 import RoleGuard from "./RoleGuard.jsx";
 
 import Login from "../pages/auth/Login.jsx";
+import Register from "../pages/auth/Register.jsx";
 import Dashboard from "../pages/dashboard/Dashboard.jsx";
+import Profile from "../pages/profile/Profile.jsx";
 
 import Projects from "../pages/projects/Projects.jsx";
 import ProjectDetails from "../pages/projects/ProjectDetails.jsx";
@@ -31,11 +33,13 @@ export default function AppRouter() {
     <Routes>
       <Route element={<PublicLayout />}>
         <Route path="/login" element={<Login />} />
+        <Route path="/register" element={<Register />} />
       </Route>
 
       <Route element={<ProtectedRoute />}>
         <Route element={<DashboardLayout />}>
           <Route path="/" element={<Dashboard />} />
+          <Route path="/profile" element={<Profile />} />
 
           {/* Projects: Admin, Project Manager */}
           <Route

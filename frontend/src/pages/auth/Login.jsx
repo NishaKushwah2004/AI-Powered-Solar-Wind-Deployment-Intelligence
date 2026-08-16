@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { useNavigate, useLocation } from "react-router-dom";
+import { useNavigate, useLocation, Link } from "react-router-dom";
 import toast from "react-hot-toast";
 import { Sun, Eye, EyeOff } from "lucide-react";
 import { useAuth } from "../../hooks/useAuth.js";
@@ -126,7 +126,10 @@ export default function Login() {
         </div>
 
         <p className="mt-6 text-center text-xs text-navy-600">
-          Renewable Deployment Intelligence Platform
+          New here?{" "}
+          <Link to="/register" className="font-medium text-brand-500 hover:text-brand-400">
+            Create an account
+          </Link>
         </p>
       </div>
     </div>

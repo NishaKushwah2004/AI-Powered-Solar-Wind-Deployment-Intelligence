@@ -20,3 +20,12 @@ export const roleBadgeTone = {
   [ROLES.GIS_ANALYST]: "brand",
   [ROLES.RENEWABLE_ENERGY_PLANNER]: "warning",
 };
+
+// Roles selectable via public self-registration (POST /auth/register).
+// role_id 1 (Admin) is intentionally excluded — admins are provisioned
+// separately and must never be exposed in the public registration UI.
+export const REGISTERABLE_ROLES = [
+  { role_id: 2, name: ROLES.GIS_ANALYST },
+  { role_id: 3, name: ROLES.PROJECT_MANAGER },
+  { role_id: 4, name: ROLES.RENEWABLE_ENERGY_PLANNER },
+];
