@@ -1,0 +1,122 @@
+import { Routes, Route, Navigate } from "react-router-dom";
+
+import PublicLayout from "../layouts/PublicLayout.jsx";
+import DashboardLayout from "../layouts/DashboardLayout.jsx";
+import ProtectedRoute from "./ProtectedRoute.jsx";
+import RoleGuard from "./RoleGuard.jsx";
+
+import Login from "../pages/auth/Login.jsx";
+import Dashboard from "../pages/dashboard/Dashboard.jsx";
+
+import Projects from "../pages/projects/Projects.jsx";
+import ProjectDetails from "../pages/projects/ProjectDetails.jsx";
+import ProjectForm from "../pages/projects/ProjectForm.jsx";
+
+import Sites from "../pages/sites/Sites.jsx";
+import SiteDetails from "../pages/sites/SiteDetails.jsx";
+import SiteForm from "../pages/sites/SiteForm.jsx";
+
+import GISAnalyst from "../pages/gis/GISAnalyst.jsx";
+import RenewableIntelligence from "../pages/intelligence/RenewableIntelligence.jsx";
+import Reports from "../pages/reports/Reports.jsx";
+import Notifications from "../pages/notifications/Notifications.jsx";
+
+import NotFound from "../pages/errors/NotFound.jsx";
+import Unauthorized from "../pages/errors/Unauthorized.jsx";
+
+import { ROLES } from "../utils/roles.js";
+
+export default function AppRouter() {
+  return (
+    <Routes>
+      <Route element={<PublicLayout />}>
+        <Route path="/login" element={<Login />} />
+      </Route>
+
+      <Route element={<ProtectedRoute />}>
+        <Route element={<DashboardLayout />}>
+          <Route path="/" element={<Dashboard />} />
+
+          {/* Projects: Admin, Project Manager */}
+          <Route
+            element={<RoleGuard allow={[ROLES.ADMIN, ROLES.PROJECT_MANAGER]} />}
+          >
+            <Route path="/projects" element={<Projects />} />
+            <Route path="/projects/new" element={<ProjectForm />} />
+            <Route path="/projects/:projectId/edit" element={<ProjectForm />} />
+          </Route>
+          {/* Project details viewable by any authenticated role that can see Projects nav */}
+          <Route
+            element={<RoleGuard allow={[ROLES.ADMIN, ROLES.PROJECT_MANAGER]} />}
+          >
+            <Route path="/projects/:projectId" element={<ProjectDetails />} />
+          </Route>
+
+          {/* Sites: all four roles */}
+          <Route
+            element={
+              <RoleGuard
+                allow={[
+                  ROLES.ADMIN,
+                  ROLES.PROJECT_MANAGER,
+                  ROLES.GIS_ANALYST,
+                  ROLES.RENEWABLE_ENERGY_PLANNER,
+                ]}
+              />
+            }
+          >
+            <Route path="/sites" element={<Sites />} />
+            <Route path="/sites/:siteId" element={<SiteDetails />} />
+          </Route>
+          <Route
+            element={<RoleGuard allow={[ROLES.ADMIN, ROLES.PROJECT_MANAGER]} />}
+          >
+            <Route path="/sites/new" element={<SiteForm />} />
+            <Route path="/sites/:siteId/edit" element={<SiteForm />} />
+          </Route>
+
+          {/* GIS: Admin, GIS Analyst, Project Manager, Planner */}
+          <Route
+            element={
+              <RoleGuard
+                allow={[
+                  ROLES.ADMIN,
+                  ROLES.GIS_ANALYST,
+                  ROLES.PROJECT_MANAGER,
+                  ROLES.RENEWABLE_ENERGY_PLANNER,
+                ]}
+              />
+            }
+          >
+            <Route path="/gis" element={<GISAnalyst />} />
+            <Route path="/intelligence" element={<RenewableIntelligence />} />
+          </Route>
+
+          {/* Reports: Admin, Planner, Project Manager, GIS Analyst */}
+          <Route
+            element={
+              <RoleGuard
+                allow={[
+                  ROLES.ADMIN,
+                  ROLES.RENEWABLE_ENERGY_PLANNER,
+                  ROLES.PROJECT_MANAGER,
+                  ROLES.GIS_ANALYST,
+                ]}
+              />
+            }
+          >
+            <Route path="/reports" element={<Reports />} />
+          </Route>
+
+          {/* Notifications: any authenticated user */}
+          <Route path="/notifications" element={<Notifications />} />
+
+          <Route path="/unauthorized" element={<Unauthorized />} />
+          <Route path="*" element={<NotFound />} />
+        </Route>
+      </Route>
+
+      <Route path="*" element={<Navigate to="/" replace />} />
+    </Routes>
+  );
+}
