@@ -157,8 +157,8 @@ class SiteService(BaseService[SiteRepository]):
         # 3. Create the basic site first
         #
         # Only user-provided information is stored here.
-        # GIS/environmental fields are populated immediately
-        # after the site receives its database ID.
+        # GIS/environmental fields are populated after the
+        # site receives its database ID.
         # -----------------------------------------------------
 
         site = Site(
@@ -170,8 +170,8 @@ class SiteService(BaseService[SiteRepository]):
             land_area=site_data.land_area,
             project_id=site_data.project_id,
 
-            # Do NOT use user-entered GIS values.
-            # These are authoritative GIS-derived fields.
+            # GIS-derived fields are populated by the
+            # GIS enrichment service.
             elevation=None,
             land_use=None,
             road_distance=None,
@@ -187,11 +187,28 @@ class SiteService(BaseService[SiteRepository]):
         # -----------------------------------------------------
         # 4. Persist basic site
         #
-        # This gives the site its database ID and ensures
-        # SQLAlchemy is tracking the object.
+        # This gives the site its database ID.
         # -----------------------------------------------------
 
         created_site = self.repository.create(site)
+
+        # -----------------------------------------------------
+        # 5. GIS / ENVIRONMENTAL ENRICHMENT
+        #
+        # IMPORTANT:
+        # The site must be enriched immediately after creation.
+        #
+        # PredictionFeatureBuilder requires a valid GIS section,
+        # especially elevation for solar and wind prediction.
+        # -----------------------------------------------------
+
+        created_site = self._enrich_site(
+            created_site
+        )
+
+        # -----------------------------------------------------
+        # 6. Notification
+        # -----------------------------------------------------
 
         self.notification_trigger_service.site_created(
             site=created_site,

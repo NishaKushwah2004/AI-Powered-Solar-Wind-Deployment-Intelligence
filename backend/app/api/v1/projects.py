@@ -12,6 +12,13 @@ from app.schemas.project import (
     ProjectUpdate,
 )
 from app.services.project_service import ProjectService
+from app.services.notification_trigger_service import (
+    NotificationTriggerService,
+)
+from app.api.deps import (
+    get_notification_trigger_service,
+    get_project_repository,
+)
 
 
 router = APIRouter(
@@ -20,9 +27,17 @@ router = APIRouter(
 )
 
 
-def get_project_service(db: Session) -> ProjectService:
+def get_project_service(
+    project_repository: ProjectRepository = Depends(
+        get_project_repository,
+    ),
+    notification_trigger_service: NotificationTriggerService = Depends(
+        get_notification_trigger_service,
+    ),
+) -> ProjectService:
     return ProjectService(
-        ProjectRepository(db)
+        repository=project_repository,
+        notification_trigger_service=notification_trigger_service,
     )
 
 
@@ -32,16 +47,16 @@ def get_project_service(db: Session) -> ProjectService:
 )
 def create_project(
     project_data: ProjectCreate,
-    db: Session = Depends(get_db),
     current_user: User = Depends(
         require_roles(
             "Admin",
             "Project Manager",
         )
     ),
+    service: ProjectService = Depends(
+        get_project_service,
+    ),
 ):
-    service = get_project_service(db)
-
     return service.create_project(
         project_data,
         current_user,
@@ -53,13 +68,13 @@ def create_project(
     response_model=list[ProjectResponse],
 )
 def get_projects(
-    db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
+    service: ProjectService = Depends(
+        get_project_service,
+    ),
 ):
-    service = get_project_service(db)
-
     return service.get_all_projects(
-        current_user
+        current_user,
     )
 
 
@@ -69,11 +84,11 @@ def get_projects(
 )
 def get_project(
     project_id: int,
-    db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
+    service: ProjectService = Depends(
+        get_project_service,
+    ),
 ):
-    service = get_project_service(db)
-
     return service.get_project_by_id(
         project_id,
         current_user,
@@ -87,16 +102,16 @@ def get_project(
 def update_project(
     project_id: int,
     project_data: ProjectUpdate,
-    db: Session = Depends(get_db),
     current_user: User = Depends(
         require_roles(
             "Admin",
             "Project Manager",
         )
     ),
+    service: ProjectService = Depends(
+        get_project_service,
+    ),
 ):
-    service = get_project_service(db)
-
     return service.update_project(
         project_id,
         project_data,
@@ -104,16 +119,18 @@ def update_project(
     )
 
 
-@router.delete("/{project_id}")
+@router.delete(
+    "/{project_id}",
+)
 def delete_project(
     project_id: int,
-    db: Session = Depends(get_db),
     current_user: User = Depends(
-        require_roles("Admin")
+        require_roles("Admin"),
+    ),
+    service: ProjectService = Depends(
+        get_project_service,
     ),
 ):
-    service = get_project_service(db)
-
     return service.delete_project(
         project_id,
         current_user,

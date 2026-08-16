@@ -1067,22 +1067,15 @@ class SiteSuitabilityService:
         if value is None:
             return {}
 
-        if isinstance(
-            value,
-            dict,
-        ):
+        if isinstance(value, dict):
             return value
 
-        if hasattr(
-            value,
-            "model_dump",
-        ):
-            return value.model_dump()
+        if hasattr(value, "model_dump"):
+            return value.model_dump(
+                mode="python"
+            )
 
-        if hasattr(
-            value,
-            "dict",
-        ):
+        if hasattr(value, "dict"):
             return value.dict()
 
         return {}
