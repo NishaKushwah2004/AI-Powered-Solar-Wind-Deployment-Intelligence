@@ -22,8 +22,8 @@ export const roleBadgeTone = {
 };
 
 // Roles selectable via public self-registration (POST /auth/register).
-// role_id 1 (Admin) is intentionally excluded — admins are provisioned
-// separately and must never be exposed in the public registration UI.
+// Admin is intentionally excluded from public registration.
+
 export const REGISTERABLE_ROLES = [
   { role_id: 2, name: ROLES.GIS_ANALYST },
   { role_id: 3, name: ROLES.PROJECT_MANAGER },

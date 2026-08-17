@@ -27,3 +27,12 @@ export function triggerBlobDownload(blob, filename) {
   link.remove();
   window.URL.revokeObjectURL(url);
 }
+
+// GET /reports/site-comparison?site_ids=1&site_ids=2
+export const compareSites = (siteIds) => {
+  const params = new URLSearchParams();
+  siteIds.forEach((id) => params.append("site_ids", String(id)));
+  return axiosClient
+    .get(`/reports/site-comparison?${params.toString()}`)
+    .then((r) => r.data);
+};

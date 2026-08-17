@@ -1,8 +1,8 @@
 import axiosClient from "./axiosClient";
 
-// POST /sites  (Admin, ProjectManager)
-// { name, description?, latitude, longitude, region?, land_area?,
-//   existing_infrastructure?, project_id } -> SiteResponse (GIS-enriched)
+// POST /sites
+// GIS Analyst can create pre-project sites with project_id: null.
+// PM/Admin can create project-linked sites with a project_id.
 export const createSite = (payload) =>
   axiosClient.post("/sites", payload).then((r) => r.data);
 

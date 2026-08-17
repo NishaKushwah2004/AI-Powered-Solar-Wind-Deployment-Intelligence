@@ -14,7 +14,8 @@ export default function Header({ title, onOpenMobileMenu }) {
   const { data: notifications } = useQuery({
     queryKey: ["notifications", "unread"],
     queryFn: () => getMyNotifications(true),
-    refetchInterval: 60_000,
+    refetchInterval: 30_000,
+    refetchOnWindowFocus: true,
   });
   const unreadCount = notifications?.length ?? 0;
 

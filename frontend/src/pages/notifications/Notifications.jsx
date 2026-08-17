@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import toast from "react-hot-toast";
-import { Bell, Check, CheckCheck, Trash2 } from "lucide-react";
+import { Bell, Check, CheckCheck, Trash2, RefreshCw } from "lucide-react";
 import PageHeader from "../../components/ui/PageHeader.jsx";
 import Button from "../../components/ui/Button.jsx";
 import Spinner from "../../components/ui/Spinner.jsx";
@@ -17,14 +17,24 @@ import {
 } from "../../api/notificationApi.js";
 import { formatDateTime } from "../../utils/formatters.js";
 import { extractErrorMessage } from "../../api/axiosClient.js";
+import { getAllSites } from "../../api/siteApi.js";
+import { evaluateSiteAlerts } from "../../api/alertApi.js";
 
 export default function Notifications() {
   const [unreadOnly, setUnreadOnly] = useState(false);
+  const [selectedSiteId, setSelectedSiteId] = useState("");
   const queryClient = useQueryClient();
+
+  const { data: sites = [], isLoading: sitesLoading } = useQuery({
+    queryKey: ["sites", "alert-evaluation"],
+    queryFn: getAllSites,
+  });
 
   const { data, isLoading, isError, error, refetch } = useQuery({
     queryKey: ["notifications", unreadOnly],
     queryFn: () => getMyNotifications(unreadOnly),
+    refetchInterval: 30_000,
+    refetchOnWindowFocus: true,
   });
 
   const invalidate = () => {
@@ -41,6 +51,21 @@ export default function Notifications() {
     mutationFn: markAllNotificationsAsRead,
     onSuccess: () => {
       toast.success("All notifications marked as read");
+      invalidate();
+    },
+    onError: (err) => toast.error(extractErrorMessage(err)),
+  });
+
+  const alertMutation = useMutation({
+    mutationFn: evaluateSiteAlerts,
+    onSuccess: (result) => {
+      toast.success(
+        result.alerts_created > 0
+          ? `${result.alerts_created} alert notification${result.alerts_created === 1 ? "" : "s"} created`
+          : result.alerts.length > 0
+            ? "Alerts found; existing recent notifications were reused"
+            : "No active alerts found for this site"
+      );
       invalidate();
     },
     onError: (err) => toast.error(extractErrorMessage(err)),
@@ -67,6 +92,31 @@ export default function Notifications() {
         }
         actions={
           <>
+            <div className="flex items-center gap-2">
+              <select
+                value={selectedSiteId}
+                onChange={(e) => setSelectedSiteId(e.target.value)}
+                disabled={sitesLoading || alertMutation.isPending}
+                className="h-9 rounded-md border border-surface-border bg-surface px-3 text-sm text-ink"
+                aria-label="Site for alert evaluation"
+              >
+                <option value="">Select site for alerts</option>
+                {sites.map((site) => (
+                  <option key={site.id} value={site.id}>
+                    {site.name} · #{site.id}
+                  </option>
+                ))}
+              </select>
+              <Button
+                variant="secondary"
+                size="sm"
+                disabled={!selectedSiteId}
+                isLoading={alertMutation.isPending}
+                onClick={() => alertMutation.mutate(Number(selectedSiteId))}
+              >
+                <RefreshCw className="h-4 w-4" /> Check alerts
+              </Button>
+            </div>
             <Button
               variant={unreadOnly ? "secondary" : "ghost"}
               size="sm"

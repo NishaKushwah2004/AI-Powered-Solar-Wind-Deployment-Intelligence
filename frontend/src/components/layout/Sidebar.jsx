@@ -7,6 +7,7 @@ import {
   Leaf,
   FileBarChart2,
   Bell,
+  ClipboardCheck,
   ShieldCheck,
   Sun,
   X,
@@ -46,6 +47,12 @@ const NAV_ITEMS = [
     label: "Reports",
     icon: FileBarChart2,
     roles: [ROLES.ADMIN, ROLES.RENEWABLE_ENERGY_PLANNER, ROLES.PROJECT_MANAGER, ROLES.GIS_ANALYST],
+  },
+  {
+    to: "/candidate-sites",
+    label: "Candidate Sites",
+    icon: ClipboardCheck,
+    roles: [ROLES.ADMIN, ROLES.RENEWABLE_ENERGY_PLANNER, ROLES.PROJECT_MANAGER],
   },
   { to: "/notifications", label: "Notifications", icon: Bell, roles: null },
   {

@@ -24,6 +24,7 @@ import RenewableIntelligence from "../pages/intelligence/RenewableIntelligence.j
 import Environment from "../pages/environment/Environment.jsx";
 import Reports from "../pages/reports/Reports.jsx";
 import Notifications from "../pages/notifications/Notifications.jsx";
+import CandidateSites from "../pages/candidate-sites/CandidateSites.jsx";
 
 import NotFound from "../pages/errors/NotFound.jsx";
 import Unauthorized from "../pages/errors/Unauthorized.jsx";
@@ -134,6 +135,21 @@ export default function AppRouter() {
             }
           >
             <Route path="/reports" element={<Reports />} />
+          </Route>
+
+          {/* Candidate workflow: Planner can monitor submissions; PM/Admin can review. */}
+          <Route
+            element={
+              <RoleGuard
+                allow={[
+                  ROLES.ADMIN,
+                  ROLES.PROJECT_MANAGER,
+                  ROLES.RENEWABLE_ENERGY_PLANNER,
+                ]}
+              />
+            }
+          >
+            <Route path="/candidate-sites" element={<CandidateSites />} />
           </Route>
 
           {/* Notifications: any authenticated user */}

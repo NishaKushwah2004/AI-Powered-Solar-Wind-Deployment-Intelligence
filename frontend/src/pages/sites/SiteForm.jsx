@@ -25,7 +25,7 @@ const schema = z.object({
   region: z.string().optional(),
   land_area: z.coerce.number().optional().or(z.nan()).transform((v) => (Number.isNaN(v) ? undefined : v)),
   existing_infrastructure: z.string().optional(),
-  project_id: z.coerce.number({ invalid_type_error: "Select a project" }),
+  project_id: z.coerce.number().nullable().optional(),
 });
 
 export default function SiteForm() {
@@ -50,7 +50,7 @@ export default function SiteForm() {
   } = useForm({
     resolver: zodResolver(schema),
     defaultValues: {
-      project_id: searchParams.get("project_id") || "",
+      project_id: searchParams.get("project_id") ? Number(searchParams.get("project_id")) : null,
     },
   });
 
@@ -64,7 +64,7 @@ export default function SiteForm() {
         region: existing.region || "",
         land_area: existing.land_area ?? undefined,
         existing_infrastructure: existing.existing_infrastructure || "",
-        project_id: existing.project_id,
+        project_id: existing.project_id ?? null,
       });
     }
   }, [existing, reset]);
@@ -103,7 +103,7 @@ export default function SiteForm() {
       </Link>
       <PageHeader
         title={isEdit ? "Edit site" : "New site"}
-        description="Only base site details are entered here. Elevation, land use, and proximity metrics are populated automatically by GIS enrichment on the backend."
+        description="Create a project-linked site or a pre-project site. GIS enrichment populates elevation, land use, and proximity metrics from the coordinates."
       />
 
       <Card>
@@ -115,9 +115,9 @@ export default function SiteForm() {
             <Select
               label="Project"
               error={errors.project_id?.message}
-              {...register("project_id")}
+              {...register("project_id", { setValueAs: (value) => value === "" ? null : Number(value) })}
             >
-              <option value="">Select a project</option>
+              <option value="">Pre-project site (no project yet)</option>
               {projects?.map((p) => (
                 <option key={p.id} value={p.id}>
                   {p.name}

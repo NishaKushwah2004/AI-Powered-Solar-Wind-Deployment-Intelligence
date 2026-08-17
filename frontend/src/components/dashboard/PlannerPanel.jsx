@@ -19,6 +19,10 @@ export default function PlannerPanel() {
   const { data, isLoading, isError, error, refetch } = useQuery({
     queryKey: ["dashboard-planner"],
     queryFn: getPlannerDashboard,
+    // The backend dashboard is read-only/cached intelligence. Avoid
+    // unnecessary refetches while navigating around the dashboard.
+    staleTime: 60_000,
+    refetchOnWindowFocus: false,
   });
 
   if (isLoading) return <div className="flex justify-center py-8"><Spinner /></div>;
@@ -29,7 +33,10 @@ export default function PlannerPanel() {
 
   return (
     <section>
-      <h2 className="mb-3 text-sm font-semibold text-ink">Renewable Energy Planner Overview</h2>
+      <div className="mb-3 flex items-center justify-between gap-3">
+        <h2 className="text-sm font-semibold text-ink">Renewable Energy Planner Overview</h2>
+        <span className="text-[11px] text-ink-faint">Based on stored site intelligence</span>
+      </div>
 
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
         <MiniStat label="Recommended Sites" value={summary.recommendedSites} />
@@ -49,6 +56,7 @@ export default function PlannerPanel() {
           <CardHeader><CardTitle>Generation Forecast</CardTitle></CardHeader>
           <CardBody>
             <div className="h-56">
+              {generation_forecast?.length ? (
               <ResponsiveContainer width="100%" height="100%">
                 <LineChart data={generation_forecast}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0" />
@@ -58,6 +66,11 @@ export default function PlannerPanel() {
                   <Line type="monotone" dataKey="generation_mwh" stroke="#12B76A" strokeWidth={2} dot={false} />
                 </LineChart>
               </ResponsiveContainer>
+              ) : (
+                <div className="flex h-full items-center justify-center text-xs text-ink-faint">
+                  No stored energy forecast is available yet.
+                </div>
+              )}
             </div>
           </CardBody>
         </Card>
@@ -65,7 +78,7 @@ export default function PlannerPanel() {
         <Card>
           <CardHeader><CardTitle>Investment Recommendations</CardTitle></CardHeader>
           <CardBody className="max-h-56 space-y-2 overflow-y-auto">
-            {investment_recommendations?.slice(0, 6).map((item) => (
+            {investment_recommendations?.length ? investment_recommendations.slice(0, 6).map((item) => (
               <div key={item.site_id} className="flex items-center justify-between rounded-md border border-border px-3 py-2 text-xs">
                 <div>
                   <p className="font-medium text-ink">{item.site_name}</p>
@@ -75,7 +88,11 @@ export default function PlannerPanel() {
                   {item.recommendation}
                 </Badge>
               </div>
-            ))}
+            )) : (
+              <p className="py-6 text-center text-xs text-ink-faint">
+                No stored investment recommendation is available yet.
+              </p>
+            )}
           </CardBody>
         </Card>
       </div>

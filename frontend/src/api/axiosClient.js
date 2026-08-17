@@ -8,9 +8,13 @@ export const TOKEN_STORAGE_KEY = "hg_access_token";
 const axiosClient = axios.create({
   baseURL: BASE_URL,
   headers: { "Content-Type": "application/json" },
+  timeout: 30000,
 });
 
 axiosClient.interceptors.request.use((config) => {
+  const requestId = crypto?.randomUUID?.() || `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+  config.headers["X-Request-ID"] = requestId;
+
   const token = localStorage.getItem(TOKEN_STORAGE_KEY);
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;

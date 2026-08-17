@@ -79,7 +79,7 @@ export default function Register() {
             Create your account
           </h2>
           <p className="mb-5 text-xs text-navy-600">
-            Register for platform access with your team role.
+            Choose the role you will use on the deployment workflow.
           </p>
 
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">

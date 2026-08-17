@@ -42,9 +42,8 @@ export default function SiteDetails() {
   const canDelete = hasRole(user, ROLES.ADMIN);
   const canAnalyze = hasRole(
     user,
-    ROLES.ADMIN,
-    ROLES.GIS_ANALYST,
-    ROLES.RENEWABLE_ENERGY_PLANNER
+    ROLES.RENEWABLE_ENERGY_PLANNER,
+    ROLES.PROJECT_MANAGER
   );
 
   if (isLoading) {

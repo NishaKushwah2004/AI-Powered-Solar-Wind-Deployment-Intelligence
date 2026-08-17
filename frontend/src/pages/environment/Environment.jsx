@@ -8,6 +8,8 @@ import {
   Mountain,
   MapPinned,
   Eye,
+  Wind,
+  Gauge,
 } from "lucide-react";
 import PageHeader from "../../components/ui/PageHeader.jsx";
 import Tabs from "../../components/ui/Tabs.jsx";
@@ -21,6 +23,7 @@ import Button from "../../components/ui/Button.jsx";
 import { getAllSites } from "../../api/siteApi.js";
 import { getProjects } from "../../api/projectApi.js";
 import { getSiteEnvironment, getProjectEnvironment } from "../../api/environmentApi.js";
+import { getSiteResourceAssessment } from "../../api/resourceAssessmentApi.js";
 import { formatCoordinate, formatNumber } from "../../utils/formatters.js";
 
 const WEATHER_FIELDS = [
@@ -68,6 +71,12 @@ export default function Environment() {
 
   const { data: sites } = useQuery({ queryKey: ["sites"], queryFn: getAllSites });
   const { data: projects } = useQuery({ queryKey: ["projects"], queryFn: getProjects });
+
+  const resourceQuery = useQuery({
+    queryKey: ["site-resource-assessment", siteId],
+    queryFn: () => getSiteResourceAssessment(siteId),
+    enabled: mode === "site" && Boolean(siteId),
+  });
 
   const siteQuery = useQuery({
     queryKey: ["site-environment", siteId],
@@ -153,6 +162,7 @@ export default function Environment() {
         <SiteMode
           siteId={siteId}
           query={siteQuery}
+          resourceQuery={resourceQuery}
         />
       )}
 
@@ -167,7 +177,7 @@ export default function Environment() {
   );
 }
 
-function SiteMode({ siteId, query }) {
+function SiteMode({ siteId, query, resourceQuery }) {
   if (!siteId) {
     return (
       <EmptyState
@@ -190,7 +200,7 @@ function SiteMode({ siteId, query }) {
   if (isError) return <ErrorState error={error} onRetry={refetch} />;
   if (!data) return null;
 
-  return <SiteEnvironmentReport report={data} />;
+  return <SiteEnvironmentReport report={data} resourceQuery={resourceQuery} />;
 }
 
 function ProjectMode({ projectId, query, onViewSite }) {
@@ -279,7 +289,7 @@ function ProjectMode({ projectId, query, onViewSite }) {
   );
 }
 
-function SiteEnvironmentReport({ report }) {
+function SiteEnvironmentReport({ report, resourceQuery }) {
   return (
     <div className="space-y-4">
       <Card>
@@ -294,6 +304,8 @@ function SiteEnvironmentReport({ report }) {
           />
         </CardBody>
       </Card>
+
+      <ResourceAssessmentSection query={resourceQuery} />
 
       <div className="grid gap-4 lg:grid-cols-2">
         <MetricSection
@@ -318,6 +330,97 @@ function SiteEnvironmentReport({ report }) {
       </div>
     </div>
   );
+}
+
+function ResourceAssessmentSection({ query }) {
+  const { data, isLoading, isError, refetch } = query;
+
+  if (isLoading) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle>Renewable Resource Assessment</CardTitle>
+        </CardHeader>
+        <CardBody>
+          <div className="py-4 text-sm text-ink-faint">Building resource assessment...</div>
+        </CardBody>
+      </Card>
+    );
+  }
+
+  if (isError) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle>Renewable Resource Assessment</CardTitle>
+        </CardHeader>
+        <CardBody>
+          <div className="flex items-center justify-between gap-3 text-sm">
+            <span className="text-ink-subtle">Resource assessment is temporarily unavailable.</span>
+            <Button variant="ghost" size="sm" onClick={() => refetch()}>Retry</Button>
+          </div>
+        </CardBody>
+      </Card>
+    );
+  }
+
+  if (!data) return null;
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Renewable Resource Assessment</CardTitle>
+        <div className="flex items-center gap-2 text-ink-faint">
+          <Sun className="h-4 w-4" />
+          <Wind className="h-4 w-4" />
+          <Gauge className="h-4 w-4" />
+        </div>
+      </CardHeader>
+      <CardBody className="space-y-5">
+        <div className="grid gap-4 lg:grid-cols-2">
+          <ResourceColumn title="Solar" metrics={data.solar} />
+          <ResourceColumn title="Wind" metrics={data.wind} />
+        </div>
+        {data.assessment_notes?.length > 0 && (
+          <div className="rounded-md border border-border bg-surface-muted p-3">
+            <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-ink-faint">Assessment notes</p>
+            <ul className="list-disc space-y-1 pl-4 text-xs text-ink-subtle">
+              {data.assessment_notes.map((note, index) => <li key={index}>{note}</li>)}
+            </ul>
+          </div>
+        )}
+      </CardBody>
+    </Card>
+  );
+}
+
+function ResourceColumn({ title, metrics }) {
+  const entries = Object.entries(metrics || {});
+  return (
+    <div>
+      <h4 className="mb-2 text-sm font-semibold text-ink">{title}</h4>
+      <div className="divide-y divide-border rounded-md border border-border">
+        {entries.map(([key, metric]) => (
+          <div key={key} className="flex items-start justify-between gap-4 px-3 py-2 text-sm">
+            <span className="text-ink-faint">{labelize(key)}</span>
+            <div className="text-right">
+              <div className={`font-medium ${metric?.status === "unavailable" ? "text-ink-faint" : "text-ink"}`}>
+                {metric?.status === "unavailable" || metric?.value === null || metric?.value === undefined
+                  ? "Unavailable"
+                  : `${formatNumber(metric.value, { maximumFractionDigits: 3 })} ${metric.unit}`}
+              </div>
+              <div className="text-[11px] text-ink-faint">{metric?.source || "—"}</div>
+              {metric?.note && <div className="mt-0.5 max-w-xs text-[11px] text-ink-faint">{metric.note}</div>}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function labelize(key) {
+  return key.replaceAll("_", " ").replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
 function MetricSection({ icon: Icon, title, fields, data, className }) {
