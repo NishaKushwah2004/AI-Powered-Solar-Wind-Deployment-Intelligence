@@ -61,9 +61,7 @@ def recommend_site_technology(
     current_user=Depends(
         require_roles(
             "Renewable Energy Planner",
-            "GIS Analyst",
             "Project Manager",
-            "Admin",
         )
     ),
 ):

@@ -62,9 +62,7 @@ def evaluate_site_suitability(
     current_user=Depends(
         require_roles(
             "Renewable Energy Planner",
-            "GIS Analyst",
             "Project Manager",
-            "Admin",
         )
     ),
 ):

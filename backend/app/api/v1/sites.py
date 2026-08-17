@@ -41,12 +41,17 @@ def create_site(
         require_roles(
             "Admin",
             "Project Manager",
+            "GIS Analyst",
         )
     ),
 ):
     """
     Create a site and automatically enrich it with
     GIS/environmental data.
+
+    GIS Analysts create pre-project sites (project_id omitted).
+    Project Managers/Admins retain the existing project-linked
+    site creation capability.
 
     Flow:
         POST /sites
@@ -160,6 +165,7 @@ def update_site(
         require_roles(
             "Admin",
             "Project Manager",
+            "GIS Analyst"
         )
     ),
 ):

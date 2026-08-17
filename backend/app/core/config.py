@@ -15,6 +15,9 @@ class Settings(BaseSettings):
     HOST: str
     PORT: int
 
+    # Comma-separated browser origins. Keep localhost defaults for local development.
+    ALLOWED_ORIGINS: str = "http://localhost:5173,http://127.0.0.1:5173"
+
     DATABASE_URL: str
 
     SECRET_KEY: str

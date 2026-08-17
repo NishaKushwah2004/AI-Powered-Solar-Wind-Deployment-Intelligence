@@ -116,6 +116,34 @@ class NotificationRepository:
 
         return count
 
+
+    # =========================================================
+    # ACTIVE USERS BY ROLE
+    # =========================================================
+
+    def get_active_user_ids_by_role(
+        self,
+        role_name: str,
+        exclude_user_id: int | None = None,
+    ) -> list[int]:
+        """Return active user ids that currently hold a role."""
+        from app.models.role import Role
+        from app.models.user import User
+
+        query = (
+            self.db.query(User.id)
+            .join(Role, User.role_id == Role.id)
+            .filter(
+                Role.name == role_name,
+                User.is_active.is_(True),
+            )
+        )
+
+        if exclude_user_id is not None:
+            query = query.filter(User.id != exclude_user_id)
+
+        return [row[0] for row in query.all()]
+
     # =========================================================
     # DELETE
     # =========================================================

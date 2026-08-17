@@ -15,11 +15,6 @@ from app.schemas.gis_analyst_dashboard import (
     TerrainMapSite,
 )
 
-from app.services.site_suitability_service import (
-    SiteSuitabilityService,
-)
-
-
 class GISAnalystDashboardService:
     """
     GIS Analyst Dashboard orchestration service.
@@ -29,8 +24,7 @@ class GISAnalystDashboardService:
         - Aggregate GIS/environmental analytics.
         - Build terrain information.
         - Build site comparison data.
-        - Obtain the authoritative suitability score from
-          SiteSuitabilityService.
+        - Read persisted candidate intelligence/suitability when available.
 
     This service does NOT:
         - call GIS providers directly
@@ -43,14 +37,9 @@ class GISAnalystDashboardService:
     def __init__(
         self,
         db: Session,
-        site_suitability_service: SiteSuitabilityService,
     ):
         self.repository = (
             GISAnalystDashboardRepository(db)
-        )
-
-        self.site_suitability_service = (
-            site_suitability_service
         )
 
     # =========================================================
@@ -62,6 +51,11 @@ class GISAnalystDashboardService:
     ) -> GISAnalystDashboardResponse:
 
         sites = self.repository.get_sites()
+
+        # CandidateSite is the persisted source of truth for expensive
+        # suitability/intelligence results. Fetch all candidates once so
+        # dashboard rendering never recalculates suitability per site.
+        candidate_by_site = self.repository.get_candidate_map()
 
         visualization_sites: list[
             GISVisualizationSite
@@ -194,20 +188,15 @@ class GISAnalystDashboardService:
                 enriched_sites += 1
 
             # =================================================
-            # AUTHORITATIVE SITE SUITABILITY
+            # PERSISTED SITE SUITABILITY
             # =================================================
 
-            suitability = (
-                self.site_suitability_service
-                .evaluate_site(
-                    site_id=site_id,
-                )
-            )
+            # Do not invoke SiteSuitabilityService here. Dashboard
+            # rendering must remain a read-only, bounded-cost operation.
+            candidate = candidate_by_site.get(site_id)
 
-            suitability_score = (
-                self._extract_suitability_score(
-                    suitability
-                )
+            suitability_score = self._candidate_suitability_score(
+                candidate
             )
 
             # =================================================
@@ -506,41 +495,42 @@ class GISAnalystDashboardService:
             return default
 
     # ---------------------------------------------------------
-    # Suitability score extraction
+    # Persisted candidate suitability
     # ---------------------------------------------------------
 
     @staticmethod
-    def _extract_suitability_score(
-        suitability,
+    def _candidate_suitability_score(
+        candidate,
     ) -> float:
-
-        if suitability is None:
+        if candidate is None:
             return 0.0
 
         value = getattr(
-            suitability,
-            "overall_score",
+            candidate,
+            "suitability_score",
             None,
         )
 
-        if value is None and isinstance(
-            suitability,
-            dict,
-        ):
-            value = suitability.get(
-                "overall_score"
-            )
-
         if value is None:
-            return 0.0
+            snapshot = getattr(
+                candidate,
+                "analysis_snapshot",
+                None,
+            )
+            if isinstance(snapshot, dict):
+                suitability = snapshot.get("suitability")
+                if isinstance(suitability, dict):
+                    value = (
+                        suitability.get("overall_score")
+                        if suitability.get("overall_score") is not None
+                        else suitability.get("suitability_score")
+                    )
+                if value is None:
+                    value = snapshot.get("suitability_score")
 
         try:
-            return float(value)
-
-        except (
-            TypeError,
-            ValueError,
-        ):
+            return float(value) if value is not None else 0.0
+        except (TypeError, ValueError):
             return 0.0
 
     # ---------------------------------------------------------

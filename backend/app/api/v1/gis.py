@@ -136,6 +136,13 @@ def get_bounding_box(
     service: GISService = Depends(
         get_gis_service,
     ),
+    current_user=Depends(
+        require_roles(
+            "GIS Analyst",
+            "Renewable Energy Planner",
+            "Project Manager",
+        )
+    ),
 ):
     return service.get_bounding_box()
 
@@ -150,6 +157,13 @@ def get_bounding_box(
 def get_summary(
     service: GISService = Depends(
         get_gis_service,
+    ),
+    current_user=Depends(
+        require_roles(
+            "GIS Analyst",
+            "Renewable Energy Planner",
+            "Project Manager",
+        )
     ),
 ):
     return service.get_map_summary()

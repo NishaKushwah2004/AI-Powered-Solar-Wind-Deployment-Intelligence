@@ -1,3 +1,14 @@
+# Operational roles used by the current target architecture.
+GIS_ANALYST_ROLE = "GIS Analyst"
+ENERGY_PLANNER_ROLE = "Renewable Energy Planner"
+PROJECT_MANAGER_ROLE = "Project Manager"
+
+OPERATIONAL_ROLES = {
+    GIS_ANALYST_ROLE,
+    ENERGY_PLANNER_ROLE,
+    PROJECT_MANAGER_ROLE,
+}
+
 from fastapi import Depends, HTTPException, status
 
 from app.auth.dependencies import get_current_user

@@ -110,15 +110,15 @@ class Site(Base, TimestampMixin):
         nullable=True,
     )
 
-    project_id: Mapped[int] = mapped_column(
+    project_id: Mapped[int | None] = mapped_column(
         ForeignKey(
             "projects.id",
-            ondelete="CASCADE",
+            ondelete="SET NULL",
         ),
-        nullable=False,
+        nullable=True,
         index=True,
     )
 
-    project: Mapped["Project"] = relationship(
+    project: Mapped["Project | None"] = relationship(
         back_populates="sites",
     )

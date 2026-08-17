@@ -2,6 +2,7 @@ from fastapi import (
     APIRouter,
     Depends,
     HTTPException,
+    Query,
     status,
 )
 from fastapi.responses import StreamingResponse
@@ -16,6 +17,7 @@ from app.auth.permissions import (
 
 from app.schemas.reports import (
     SiteReportResponse,
+    SiteComparisonResponse,
 )
 
 from app.services.report_service import (
@@ -29,6 +31,33 @@ router = APIRouter(
 )
 
 
+
+@router.get(
+    "/site-comparison",
+    response_model=SiteComparisonResponse,
+)
+def compare_sites(
+    site_ids: list[int] = Query(...),
+    service: ReportService = Depends(get_report_service),
+    current_user=Depends(
+        require_roles(
+            "Admin",
+            "Renewable Energy Planner",
+            "Project Manager",
+            "GIS Analyst",
+        )
+    ),
+):
+    """Compare 2-5 sites using the existing suitability/recommendation pipeline."""
+    try:
+        return service.compare_sites(site_ids)
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=str(exc),
+        )
+
+    
 # =========================================================
 # SITE REPORT - JSON
 # =========================================================

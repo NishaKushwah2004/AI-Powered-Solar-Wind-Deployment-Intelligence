@@ -40,9 +40,7 @@ def forecast_site_energy(
     current_user=Depends(
         require_roles(
             "Renewable Energy Planner",
-            "GIS Analyst",
             "Project Manager",
-            "Admin",
         )
     ),
 ):

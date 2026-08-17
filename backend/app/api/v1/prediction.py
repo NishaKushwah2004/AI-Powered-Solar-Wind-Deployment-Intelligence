@@ -1,5 +1,7 @@
 from fastapi import APIRouter, Depends
 
+from app.auth.permissions import require_roles
+
 from app.api.deps import (
     get_prediction_service,
     get_renewable_intelligence_service,
@@ -44,6 +46,12 @@ def predict_solar(
     prediction_service: PredictionService = Depends(
         get_prediction_service,
     ),
+    current_user=Depends(
+        require_roles(
+            "Renewable Energy Planner",
+            "Project Manager",
+        )
+    ),
 ) -> PredictionResponse:
 
     return prediction_service.predict_solar(
@@ -63,6 +71,12 @@ def predict_wind(
     data: WindPredictionRequest,
     prediction_service: PredictionService = Depends(
         get_prediction_service,
+    ),
+    current_user=Depends(
+        require_roles(
+            "Renewable Energy Planner",
+            "Project Manager",
+        )
     ),
 ) -> PredictionResponse:
 
@@ -92,6 +106,12 @@ def predict_renewable(
     data: RenewablePredictionRequest,
     prediction_service: PredictionService = Depends(
         get_prediction_service,
+    ),
+    current_user=Depends(
+        require_roles(
+            "Renewable Energy Planner",
+            "Project Manager",
+        )
     ),
 ) -> RenewablePredictionResponse:
 
@@ -136,6 +156,12 @@ def predict_site(
     site_id: int,
     intelligence_service: RenewableIntelligenceService = Depends(
         get_renewable_intelligence_service,
+    ),
+    current_user=Depends(
+        require_roles(
+            "Renewable Energy Planner",
+            "Project Manager",
+        )
     ),
 ):
     return intelligence_service.analyze_site(

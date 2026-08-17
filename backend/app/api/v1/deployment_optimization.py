@@ -40,9 +40,7 @@ def optimize_site_deployment(
     current_user=Depends(
         require_roles(
             "Renewable Energy Planner",
-            "GIS Analyst",
             "Project Manager",
-            "Admin",
         )
     ),
 ):

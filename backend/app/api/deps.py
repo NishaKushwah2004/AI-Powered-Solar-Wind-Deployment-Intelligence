@@ -123,6 +123,10 @@ from app.services.investment_recommendation_service import (
 from app.services.project_manager_dashboard_service import (
     ProjectManagerDashboardService,
 )
+from app.services.resource_assessment_service import (
+    ResourceAssessmentService,
+)
+
 
 from app.services.planner_dashboard_service import (
     PlannerDashboardService,
@@ -536,27 +540,11 @@ def get_investment_recommendation_service(
 
 def get_project_manager_dashboard_service(
     db: Session = Depends(get_db),
-
-    deployment_optimization_service:
-        DeploymentOptimizationService = Depends(
-            get_deployment_optimization_service,
-        ),
-
-    investment_recommendation_service:
-        InvestmentRecommendationService = Depends(
-            get_investment_recommendation_service,
-        ),
 ) -> ProjectManagerDashboardService:
-
-    return ProjectManagerDashboardService(
-        db=db,
-        deployment_optimization_service=(
-            deployment_optimization_service
-        ),
-        investment_recommendation_service=(
-            investment_recommendation_service
-        ),
-    )
+    # Read-only dashboard dependency. Expensive intelligence services are
+    # intentionally excluded from this request path. The dashboard reads
+    # persisted CandidateSite.analysis_snapshot data.
+    return ProjectManagerDashboardService(db=db)
 
 # =========================================================
 # PLANNER DASHBOARD
@@ -564,51 +552,10 @@ def get_project_manager_dashboard_service(
 
 def get_planner_dashboard_service(
     db: Session = Depends(get_db),
-
-    site_suitability_service: SiteSuitabilityService = Depends(
-        get_site_suitability_service,
-    ),
-
-    renewable_recommendation_service: RenewableRecommendationService = Depends(
-        get_renewable_recommendation_service,
-    ),
-
-    deployment_optimization_service: DeploymentOptimizationService = Depends(
-        get_deployment_optimization_service,
-    ),
-
-    energy_forecasting_service: EnergyForecastingService = Depends(
-        get_energy_forecasting_service,
-    ),
-
-    investment_recommendation_service: InvestmentRecommendationService = Depends(
-        get_investment_recommendation_service,
-    ),
 ) -> PlannerDashboardService:
-
-    return PlannerDashboardService(
-        db=db,
-
-        site_suitability_service=(
-            site_suitability_service
-        ),
-
-        renewable_recommendation_service=(
-            renewable_recommendation_service
-        ),
-
-        deployment_optimization_service=(
-            deployment_optimization_service
-        ),
-
-        energy_forecasting_service=(
-            energy_forecasting_service
-        ),
-
-        investment_recommendation_service=(
-            investment_recommendation_service
-        ),
-    )
+    # Read-only dashboard dependency. Expensive intelligence services are
+    # intentionally excluded from this request path.
+    return PlannerDashboardService(db=db)
 
 
 # =========================================================
@@ -617,18 +564,10 @@ def get_planner_dashboard_service(
 
 def get_gis_analyst_dashboard_service(
     db: Session = Depends(get_db),
-
-    site_suitability_service: SiteSuitabilityService = Depends(
-        get_site_suitability_service,
-    ),
 ) -> GISAnalystDashboardService:
-
-    return GISAnalystDashboardService(
-        db=db,
-        site_suitability_service=(
-            site_suitability_service
-        ),
-    )
+    # Read-only dashboard dependency. Expensive intelligence services are
+    # intentionally excluded from this request path.
+    return GISAnalystDashboardService(db=db)
 
 # =========================================================
 # REPORT SERVICE
@@ -698,3 +637,22 @@ def get_report_service(
         ),
     )
 
+
+# =========================================================
+# RESOURCE ASSESSMENT
+# =========================================================
+
+def get_resource_assessment_service(
+    db: Session = Depends(get_db),
+    environmental_service: EnvironmentalService = Depends(get_environmental_service),
+    prediction_service: PredictionService = Depends(get_prediction_service),
+    deployment_optimization_service: DeploymentOptimizationService = Depends(get_deployment_optimization_service),
+    energy_forecasting_service: EnergyForecastingService = Depends(get_energy_forecasting_service),
+) -> ResourceAssessmentService:
+    return ResourceAssessmentService(
+        db=db,
+        environmental_service=environmental_service,
+        prediction_service=prediction_service,
+        deployment_optimization_service=deployment_optimization_service,
+        energy_forecasting_service=energy_forecasting_service,
+    )

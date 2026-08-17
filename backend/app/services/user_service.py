@@ -8,6 +8,15 @@ from app.repositories.user_repository import UserRepository
 from app.schemas.user import UserCreate, UserProfileUpdate
 from app.services.base_service import BaseService
 
+# Roles that may be explicitly selected during public registration.
+# Admin is deliberately excluded; administrative provisioning is out of
+# scope for the current target architecture phase.
+REGISTERABLE_ROLE_NAMES = {
+    "GIS Analyst",
+    "Renewable Energy Planner",
+    "Project Manager",
+}
+
 
 class UserService(BaseService[UserRepository]):
     def __init__(
@@ -40,6 +49,16 @@ class UserService(BaseService[UserRepository]):
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="Role not found",
+            )
+
+        if role.name not in REGISTERABLE_ROLE_NAMES:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=(
+                    "This role cannot be selected during public registration. "
+                    "Choose GIS Analyst, Renewable Energy Planner, or "
+                    "Project Manager."
+                ),
             )
 
         user = User(

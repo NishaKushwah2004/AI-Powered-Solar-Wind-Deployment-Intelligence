@@ -33,6 +33,8 @@ from app.prediction.services.prediction_service import (
 from app.schemas.reports import (
     SiteReportResponse,
     SiteReportSummary,
+    SiteComparisonItem,
+    SiteComparisonResponse,
 )
 
 
@@ -304,6 +306,70 @@ class ReportService:
             ),
         )
     
+    # =========================================================
+    # SITE COMPARISON
+    # =========================================================
+
+    def compare_sites(self, site_ids: list[int]) -> SiteComparisonResponse:
+        """
+        Compare a small set of sites using the existing intelligence
+        services. No scoring logic is duplicated here; suitability and
+        recommendation remain authoritative in their existing services.
+        """
+        if len(site_ids) < 2:
+            raise ValueError("Select at least 2 sites for comparison.")
+        if len(site_ids) > 5:
+            raise ValueError("A maximum of 5 sites can be compared at once.")
+
+        unique_ids = list(dict.fromkeys(site_ids))
+        sites = (
+            self.db.query(Site)
+            .filter(Site.id.in_(unique_ids))
+            .all()
+        )
+        by_id = {site.id: site for site in sites}
+        missing = [site_id for site_id in unique_ids if site_id not in by_id]
+        if missing:
+            raise ValueError(f"Site(s) not found: {', '.join(map(str, missing))}")
+
+        items = []
+        for site_id in unique_ids:
+            site = by_id[site_id]
+            suitability = self.suitability_service.evaluate_site(site_id)
+            suitability_data = self._dump(suitability)
+            recommendation = self.recommendation_service.recommend(
+                site_id=site_id,
+                suitability_data=suitability_data,
+            )
+
+            items.append(
+                SiteComparisonItem(
+                    site_id=site.id,
+                    site_name=site.name,
+                    region=site.region,
+                    latitude=site.latitude,
+                    longitude=site.longitude,
+                    land_area=site.land_area,
+                    elevation=site.elevation,
+                    land_use=site.land_use,
+                    land_slope=site.land_slope,
+                    road_distance=site.road_distance,
+                    nearest_substation_distance=site.nearest_substation_distance,
+                    suitability_score=getattr(recommendation, "overall_site_score", None),
+                    solar_score=getattr(getattr(recommendation, "solar", None), "score", None),
+                    wind_score=getattr(getattr(recommendation, "wind", None), "score", None),
+                    hybrid_score=getattr(recommendation, "hybrid_score", None),
+                    recommended_technology=(
+                        getattr(getattr(recommendation, "recommended_technology", None), "value", None)
+                        or str(getattr(recommendation, "recommended_technology", ""))
+                        or None
+                    ),
+                    deployment_feasible=getattr(recommendation, "deployment_feasible", None),
+                )
+            )
+
+        return SiteComparisonResponse(sites=items)
+
     # =========================================================
     # PDF GENERATION
     # =========================================================

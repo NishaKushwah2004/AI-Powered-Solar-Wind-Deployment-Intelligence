@@ -29,7 +29,7 @@ class SiteBase(BaseSchema):
 
     existing_infrastructure: Optional[str] = None
 
-    project_id: int
+    project_id: Optional[int] = None
 
 
 class SiteCreate(SiteBase):
