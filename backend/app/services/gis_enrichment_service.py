@@ -1,127 +1,240 @@
+from __future__ import annotations
+
 import logging
 
-from app.environmental.clients.sentinel_client import SentinelClient
-from app.environmental.exceptions import SentinelServiceError
-from app.gis.clients.elevation_client import ElevationClient
-from app.gis.clients.osm_client import OSMClient
-from app.gis.coordinates import validate_coordinates
-from app.gis.exceptions import InvalidCoordinatesError
-from app.gis.models.gis_result import GISResult
+from app.gis.clients.elevation_client import (
+    ElevationClient,
+)
+
+from app.gis.clients.osm_client import (
+    OSMClient,
+)
+
+from app.gis.clients.sentinel_client import (
+    SentinelClient,
+)
+
+from app.gis.coordinates import (
+    validate_coordinates,
+)
+
+from app.gis.exceptions import (
+    InvalidCoordinatesError,
+)
+
+from app.gis.models.gis_result import (
+    GISResult,
+)
+
 
 logger = logging.getLogger(__name__)
 
 
 class GISEnrichmentService:
     """
-    Service responsible for enriching a site using
-    external GIS and environmental data providers.
+    GIS Data Enrichment Service.
+
+    Collects geographic/environmental features from:
+
+        - OpenStreetMap / Overpass
+        - Open-Elevation
+        - Sentinel Hub
+
+    Produces raw/derived GIS data for downstream:
+
+        - Environmental analysis
+        - Feature engineering
+        - ML prediction
+        - Site suitability
+
+    This service does NOT calculate:
+
+        - ML predictions
+        - renewable recommendations
+        - deployment optimization
+        - investment recommendations
     """
 
-    def __init__(self):
-        self.osm_client = OSMClient()
-        self.elevation_client = ElevationClient()
-        self.sentinel_client = SentinelClient()
-
-    # --------------------------------------------------
-    # Helper Methods
-    # --------------------------------------------------
-
-    def _terrain_classification(
+    def __init__(
         self,
-        slope: float | None,
-    ) -> str | None:
+        osm_client: OSMClient,
+        elevation_client: ElevationClient,
+        sentinel_client: SentinelClient,
+    ):
+        self.osm_client = osm_client
+        self.elevation_client = elevation_client
+        self.sentinel_client = sentinel_client
 
-        if slope is None:
+    # =========================================================
+    # OSM
+    # =========================================================
+
+    def _get_osm_features(
+        self,
+        latitude: float,
+        longitude: float,
+    ) -> dict:
+
+        try:
+            features = self.osm_client.get_site_features(
+                latitude,
+                longitude,
+            )
+
+            if not isinstance(features, dict):
+                logger.warning(
+                    "OSM returned an invalid response for "
+                    "(%s, %s).",
+                    latitude,
+                    longitude,
+                )
+
+                return self._empty_osm_result()
+
+            return {
+                "land_use": features.get(
+                    "land_use"
+                ),
+                "road_distance": features.get(
+                    "road_distance"
+                ),
+                "substation_distance": features.get(
+                    "substation_distance"
+                ),
+                "transmission_distance": features.get(
+                    "transmission_distance"
+                ),
+                "water_distance": features.get(
+                    "water_distance"
+                ),
+                "protected_distance": features.get(
+                    "protected_distance"
+                ),
+            }
+
+        except Exception as exc:
+            logger.exception(
+                "OSM enrichment failed for "
+                "(%s, %s): %s",
+                latitude,
+                longitude,
+                exc,
+            )
+
+            return self._empty_osm_result()
+
+    @staticmethod
+    def _empty_osm_result() -> dict:
+        """
+        Missing GIS provider values remain None.
+
+        Never replace missing provider data with zero.
+        """
+
+        return {
+            "land_use": None,
+            "road_distance": None,
+            "substation_distance": None,
+            "transmission_distance": None,
+            "water_distance": None,
+            "protected_distance": None,
+        }
+
+    # =========================================================
+    # ELEVATION + SLOPE
+    # =========================================================
+
+    def _get_elevation_features(
+        self,
+        latitude: float,
+        longitude: float,
+    ) -> tuple[
+        float | None,
+        float | None,
+    ]:
+
+        elevation = None
+        slope = None
+
+        # -----------------------------------------------------
+        # Elevation
+        # -----------------------------------------------------
+
+        try:
+            elevation = (
+                self.elevation_client.get_elevation(
+                    latitude,
+                    longitude,
+                )
+            )
+
+        except Exception as exc:
+            logger.exception(
+                "Elevation lookup failed for "
+                "(%s, %s): %s",
+                latitude,
+                longitude,
+                exc,
+            )
+
+        # -----------------------------------------------------
+        # Slope
+        # -----------------------------------------------------
+
+        try:
+            slope = (
+                self.elevation_client.get_slope(
+                    latitude,
+                    longitude,
+                )
+            )
+
+        except Exception as exc:
+            logger.exception(
+                "Slope calculation failed for "
+                "(%s, %s): %s",
+                latitude,
+                longitude,
+                exc,
+            )
+
+        return elevation, slope
+
+    # =========================================================
+    # SENTINEL / NDVI
+    # =========================================================
+
+    def _get_vegetation_index(
+        self,
+        latitude: float,
+        longitude: float,
+    ) -> float | None:
+
+        try:
+            return (
+                self.sentinel_client.get_vegetation_index(
+                    latitude,
+                    longitude,
+                )
+            )
+
+        except Exception as exc:
+            logger.exception(
+                "Vegetation index lookup failed for "
+                "(%s, %s): %s",
+                latitude,
+                longitude,
+                exc,
+            )
+
             return None
 
-        if slope < 5:
-            return "Flat"
+    # =========================================================
+    # INFRASTRUCTURE DESCRIPTION
+    # =========================================================
 
-        if slope < 15:
-            return "Moderate"
-
-        return "Steep"
-
-    def _infrastructure_score(
-        self,
-        road_distance: float | None,
-        substation_distance: float | None,
-        transmission_distance: float | None,
-    ) -> float:
-
-        score = 100.0
-
-        if road_distance is not None:
-            score -= min(road_distance * 2, 20)
-
-        if substation_distance is not None:
-            score -= min(substation_distance * 3, 30)
-
-        if transmission_distance is not None:
-            score -= min(transmission_distance * 2, 20)
-
-        return round(max(score, 0), 2)
-
-    def _gis_score(
-        self,
-        land_use: str | None,
-        slope: float | None,
-        protected_area_distance: float | None,
-        infrastructure_score: float,
-    ) -> float:
-
-        score = infrastructure_score
-
-        if slope is not None:
-
-            if slope > 15:
-                score -= 20
-
-            elif slope > 5:
-                score -= 10
-
-        if (
-            protected_area_distance is not None
-            and protected_area_distance < 5
-        ):
-            score -= 25
-
-        if land_use is not None:
-
-            land_use = land_use.lower()
-
-            if land_use == "industrial":
-                score += 5
-
-            elif land_use == "residential":
-                score -= 10
-
-            elif land_use == "forest":
-                score -= 20
-
-        return round(
-            min(max(score, 0), 100),
-            2,
-        )
-
-    def _site_suitability(
-        self,
-        score: float,
-    ) -> str:
-
-        if score >= 85:
-            return "Excellent"
-
-        if score >= 70:
-            return "Good"
-
-        if score >= 50:
-            return "Moderate"
-
-        return "Poor"
-
-    def _existing_infrastructure(
-        self,
+    @staticmethod
+    def _build_infrastructure_description(
         road_distance: float | None,
         substation_distance: float | None,
         transmission_distance: float | None,
@@ -141,18 +254,18 @@ class GISEnrichmentService:
 
         if transmission_distance is not None:
             infrastructure.append(
-                f"Transmission Line ({transmission_distance:.2f} km)"
+                "Transmission Line "
+                f"({transmission_distance:.2f} km)"
             )
 
-        return (
-            ", ".join(infrastructure)
-            if infrastructure
-            else None
-        )
+        if not infrastructure:
+            return None
 
-    # --------------------------------------------------
-    # Main Enrichment
-    # --------------------------------------------------
+        return ", ".join(infrastructure)
+
+    # =========================================================
+    # MAIN ENRICHMENT
+    # =========================================================
 
     def enrich_site(
         self,
@@ -168,130 +281,87 @@ class GISEnrichmentService:
                 "Invalid latitude or longitude."
             )
 
-        land_use = self.osm_client.get_land_use(
+        # -----------------------------------------------------
+        # OSM
+        # -----------------------------------------------------
+
+        osm = self._get_osm_features(
             latitude,
             longitude,
         )
 
-        elevation = self.elevation_client.get_elevation(
-            latitude,
-            longitude,
-        )
+        # -----------------------------------------------------
+        # Elevation + slope
+        # -----------------------------------------------------
 
-        road_distance = (
-            self.osm_client.get_nearest_road_distance(
+        elevation, slope = (
+            self._get_elevation_features(
                 latitude,
                 longitude,
             )
         )
 
-        substation_distance = (
-            self.osm_client.get_nearest_substation_distance(
+        # -----------------------------------------------------
+        # Sentinel / NDVI
+        # -----------------------------------------------------
+
+        vegetation_index = (
+            self._get_vegetation_index(
                 latitude,
                 longitude,
             )
         )
 
-        transmission_distance = (
-            self.osm_client.get_nearest_transmission_line_distance(
-                latitude,
-                longitude,
+        # -----------------------------------------------------
+        # Existing infrastructure
+        # -----------------------------------------------------
+
+        infrastructure = (
+            self._build_infrastructure_description(
+                road_distance=osm[
+                    "road_distance"
+                ],
+                substation_distance=osm[
+                    "substation_distance"
+                ],
+                transmission_distance=osm[
+                    "transmission_distance"
+                ],
             )
         )
 
-        water_body_distance = (
-            self.osm_client.get_nearest_water_body_distance(
-                latitude,
-                longitude,
-            )
-        )
-
-        protected_area_distance = (
-            self.osm_client.get_nearest_protected_area_distance(
-                latitude,
-                longitude,
-            )
-        )
-
-        land_slope = self.elevation_client.get_slope(
-            latitude,
-            longitude,
-        )
-
-        vegetation_index = self._get_vegetation_index(
-            latitude,
-            longitude,
-        )
-
-        terrain = self._terrain_classification(
-            land_slope,
-        )
-
-        infrastructure_score = (
-            self._infrastructure_score(
-                road_distance,
-                substation_distance,
-                transmission_distance,
-            )
-        )
-
-        gis_score = self._gis_score(
-            land_use,
-            land_slope,
-            protected_area_distance,
-            infrastructure_score,
-        )
-
-        suitability = self._site_suitability(
-            gis_score,
-        )
-
-        infrastructure = self._existing_infrastructure(
-            road_distance,
-            substation_distance,
-            transmission_distance,
-        )
+        # -----------------------------------------------------
+        # Final result
+        # -----------------------------------------------------
 
         return GISResult(
-            land_use=land_use,
+            land_use=osm["land_use"],
+
             elevation=elevation,
-            road_distance=road_distance,
-            nearest_substation_distance=substation_distance,
-            nearest_transmission_line_distance=transmission_distance,
+
+            road_distance=osm[
+                "road_distance"
+            ],
+
+            nearest_substation_distance=osm[
+                "substation_distance"
+            ],
+
+            nearest_transmission_line_distance=osm[
+                "transmission_distance"
+            ],
+
             existing_infrastructure=infrastructure,
-            water_body_distance=water_body_distance,
-            protected_area_distance=protected_area_distance,
-            land_slope=land_slope,
+
+            water_body_distance=osm[
+                "water_distance"
+            ],
+
+            protected_area_distance=osm[
+                "protected_distance"
+            ],
+
+            land_slope=slope,
+
             vegetation_index=vegetation_index,
-            terrain_classification=terrain,
-            infrastructure_score=infrastructure_score,
-            gis_score=gis_score,
-            site_suitability=suitability,
         )
-
-    # --------------------------------------------------
-    # Sentinel
-    # --------------------------------------------------
-
-    def _get_vegetation_index(
-        self,
-        latitude: float,
-        longitude: float,
-    ) -> float | None:
-
-        try:
-            return self.sentinel_client.get_vegetation_index(
-                latitude,
-                longitude,
-            )
-
-        except SentinelServiceError:
-
-            logger.warning(
-                "Vegetation index unavailable for (%s, %s); "
-                "continuing without Sentinel data.",
-                latitude,
-                longitude,
-            )
-
-            return None

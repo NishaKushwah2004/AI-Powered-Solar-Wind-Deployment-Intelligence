@@ -1,20 +1,15 @@
-import requests
-from app.gis.exceptions import OSMServiceError
-from app.gis.providers.overpass_query import (
-    ROAD_QUERY,
-    LAND_USE_QUERY,
-    SUBSTATION_QUERY,
-    POWER_LINE_QUERY,
-    WATER_QUERY,
-    PROTECTED_AREA_QUERY,
-)
-from app.gis.coordinates import distance_between_points
 import logging
+import requests
 
 from app.gis.constants import (
     DEFAULT_SEARCH_RADIUS,
     OVERPASS_API_URL,
     REQUEST_TIMEOUT,
+)
+from app.gis.coordinates import distance_between_points
+from app.gis.exceptions import OSMServiceError
+from app.gis.providers.overpass_query import (
+    SITE_FEATURES_QUERY,
 )
 
 logger = logging.getLogger(__name__)
@@ -22,26 +17,31 @@ logger = logging.getLogger(__name__)
 
 class OSMClient:
     """
-    Client for interacting with the OpenStreetMap
-    Overpass API.
+    OpenStreetMap Overpass API Client.
+
+    Uses ONE Overpass request to retrieve all nearby
+    GIS features required by the platform.
     """
 
     def _execute_query(
         self,
         query: str,
     ) -> dict:
-        """
-        Execute an Overpass API query.
-        """
 
-        logger.info(
-            "Executing Overpass query."
-        )
+        logger.info("Executing Overpass query.")
+
+        headers = {
+            "User-Agent": (
+                "SolarWindDeploymentIntelligence/1.0"
+            ),
+            "Accept": "application/json",
+        }
 
         try:
             response = requests.post(
                 OVERPASS_API_URL,
-                data=query,
+                data={"data": query},
+                headers=headers,
                 timeout=REQUEST_TIMEOUT,
             )
 
@@ -54,13 +54,37 @@ class OSMClient:
             return response.json()
 
         except requests.Timeout as exc:
-            logger.exception("Overpass API request timed out.")
+            logger.exception(
+                "Overpass API request timed out."
+            )
+
             raise OSMServiceError(
                 "OpenStreetMap request timed out."
             ) from exc
 
         except requests.RequestException as exc:
-            logger.exception("Overpass API request failed.")
+            logger.exception(
+                "Overpass API request failed."
+            )
+
+            logger.error(
+                "Status Code: %s",
+                getattr(
+                    exc.response,
+                    "status_code",
+                    None,
+                ),
+            )
+
+            logger.error(
+                "Response: %s",
+                getattr(
+                    exc.response,
+                    "text",
+                    None,
+                ),
+            )
+
             raise OSMServiceError(
                 f"OpenStreetMap request failed: {exc}"
             ) from exc
@@ -71,9 +95,6 @@ class OSMClient:
         longitude: float,
         elements: list,
     ) -> float | None:
-        """
-        Calculate the distance (km) to the nearest OSM element.
-        """
 
         if not elements:
             return None
@@ -82,7 +103,7 @@ class OSMClient:
 
         for element in elements:
 
-            if "lat" in element and "lon" in element:
+            if "lat" in element:
                 lat = element["lat"]
                 lon = element["lon"]
 
@@ -93,14 +114,14 @@ class OSMClient:
             else:
                 continue
 
-            distance = distance_between_points(
-                latitude,
-                longitude,
-                lat,
-                lon,
+            distances.append(
+                distance_between_points(
+                    latitude,
+                    longitude,
+                    lat,
+                    lon,
+                )
             )
-
-            distances.append(distance)
 
         return (
             round(min(distances), 2)
@@ -108,13 +129,13 @@ class OSMClient:
             else None
         )
 
-    def get_land_use(
+    def get_site_features(
         self,
         latitude: float,
         longitude: float,
-    ) -> str | None:
+    ) -> dict:
 
-        query = LAND_USE_QUERY.format(
+        query = SITE_FEATURES_QUERY.format(
             lat=latitude,
             lon=longitude,
             radius=DEFAULT_SEARCH_RADIUS,
@@ -124,123 +145,98 @@ class OSMClient:
 
         elements = data.get("elements", [])
 
-        if not elements:
-            return None
+        result = {
+            "land_use": None,
+            "road_distance": None,
+            "substation_distance": None,
+            "transmission_distance": None,
+            "water_distance": None,
+            "protected_distance": None,
+        }
 
-        tags = elements[0].get("tags", {})
+        roads = []
+        substations = []
+        transmission = []
+        waters = []
+        protected = []
 
-        return (
-            tags.get("landuse")
-            or tags.get("natural")
-            or tags.get("leisure")
-            or tags.get("amenity")
-        )
+        for element in elements:
 
-    def get_nearest_road_distance(
-        self,
-        latitude: float,
-        longitude: float,
-    ) -> float | None:
+            tags = element.get("tags", {})
 
-        query = ROAD_QUERY.format(
-            lat=latitude,
-            lon=longitude,
-            radius=DEFAULT_SEARCH_RADIUS,
-        )
+            if (
+                result["land_use"] is None
+                and (
+                    "landuse" in tags
+                    or "natural" in tags
+                    or "amenity" in tags
+                    or "leisure" in tags
+                )
+            ):
+                result["land_use"] = (
+                    tags.get("landuse")
+                    or tags.get("natural")
+                    or tags.get("amenity")
+                    or tags.get("leisure")
+                )
 
-        data = self._execute_query(query)
+            if "highway" in tags:
+                roads.append(element)
 
-        return self._nearest_distance(
+            if tags.get("power") == "substation":
+                substations.append(element)
+
+            if tags.get("power") == "line":
+                transmission.append(element)
+
+            if (
+                tags.get("natural") == "water"
+                or "waterway" in tags
+            ):
+                waters.append(element)
+
+            if (
+                tags.get("boundary")
+                == "protected_area"
+                or tags.get("leisure")
+                == "nature_reserve"
+            ):
+                protected.append(element)
+
+        result["road_distance"] = self._nearest_distance(
             latitude,
             longitude,
-            data.get("elements", []),
+            roads,
         )
 
-    def get_nearest_substation_distance(
-        self,
-        latitude: float,
-        longitude: float,
-    ) -> float | None:
-
-        query = SUBSTATION_QUERY.format(
-            lat=latitude,
-            lon=longitude,
-            radius=DEFAULT_SEARCH_RADIUS,
-        )
-
-        data = self._execute_query(query)
-
-        return self._nearest_distance(
+        result[
+            "substation_distance"
+        ] = self._nearest_distance(
             latitude,
             longitude,
-            data.get("elements", []),
+            substations,
         )
 
-    def get_nearest_transmission_line_distance(
-        self,
-        latitude: float,
-        longitude: float,
-    ) -> float | None:
-
-        query = POWER_LINE_QUERY.format(
-            lat=latitude,
-            lon=longitude,
-            radius=DEFAULT_SEARCH_RADIUS,
-        )
-
-        data = self._execute_query(query)
-
-        return self._nearest_distance(
+        result[
+            "transmission_distance"
+        ] = self._nearest_distance(
             latitude,
             longitude,
-            data.get("elements", []),
+            transmission,
         )
 
-    def get_nearest_water_body_distance(
-        self,
-        latitude: float,
-        longitude: float,
-    ) -> float | None:
-        """
-        Distance (km) to the nearest water body
-        (lake, river, reservoir, etc.).
-        """
-
-        query = WATER_QUERY.format(
-            lat=latitude,
-            lon=longitude,
-            radius=DEFAULT_SEARCH_RADIUS,
-        )
-
-        data = self._execute_query(query)
-
-        return self._nearest_distance(
+        result["water_distance"] = self._nearest_distance(
             latitude,
             longitude,
-            data.get("elements", []),
+            waters,
         )
 
-    def get_nearest_protected_area_distance(
-        self,
-        latitude: float,
-        longitude: float,
-    ) -> float | None:
-        """
-        Distance (km) to the nearest protected area /
-        nature reserve, used for environmental
-        constraint screening.
-        """
-
-        query = PROTECTED_AREA_QUERY.format(
-            lat=latitude,
-            lon=longitude,
-            radius=DEFAULT_SEARCH_RADIUS,
-        )
-
-        data = self._execute_query(query)
-
-        return self._nearest_distance(
+        result[
+            "protected_distance"
+        ] = self._nearest_distance(
             latitude,
             longitude,
-            data.get("elements", []),
+            protected,
         )
+
+        return result

@@ -3,19 +3,17 @@ from pydantic import BaseModel, ConfigDict, Field
 
 class GISResult(BaseModel):
     """
-    Result returned after GIS enrichment.
+    GIS enrichment result.
 
-    Includes:
-    - Raw GIS attributes collected from providers
-    - Derived suitability metrics used by the
-      Environmental Intelligence Engine
+    Contains provider-derived and directly derived
+    geographic/environmental features.
+
+    No suitability or deployment score is calculated here.
     """
 
-    model_config = ConfigDict(from_attributes=True)
-
-    # --------------------------------------------------
-    # Raw GIS Data
-    # --------------------------------------------------
+    model_config = ConfigDict(
+        from_attributes=True
+    )
 
     land_use: str | None = None
 
@@ -40,39 +38,5 @@ class GISResult(BaseModel):
 
     vegetation_index: float | None = Field(
         default=None,
-        description="NDVI vegetation index from Sentinel.",
-    )
-
-    # --------------------------------------------------
-    # Derived GIS Intelligence
-    # --------------------------------------------------
-
-    terrain_classification: str | None = Field(
-        default=None,
-        description="Flat / Moderate / Steep terrain classification.",
-    )
-
-    infrastructure_score: float | None = Field(
-        default=None,
-        ge=0,
-        le=100,
-        description="Infrastructure accessibility score (0-100).",
-    )
-
-    gis_score: float | None = Field(
-        default=None,
-        ge=0,
-        le=100,
-        description="Overall GIS suitability score (0-100).",
-    )
-
-    site_suitability: str | None = Field(
-        default=None,
-        description="Overall geographic suitability classification.",
-        examples=[
-            "Excellent",
-            "Good",
-            "Moderate",
-            "Poor",
-        ],
+        description="NDVI vegetation index.",
     )

@@ -1,12 +1,6 @@
 from typing import TYPE_CHECKING
 
-from sqlalchemy import (
-    CheckConstraint,
-    Float,
-    ForeignKey,
-    String,
-    Text,
-)
+from sqlalchemy import CheckConstraint, Float, ForeignKey, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base
@@ -45,10 +39,6 @@ class Site(Base, TimestampMixin):
         nullable=True,
     )
 
-    # ----------------------------
-    # Geographic Coordinates
-    # ----------------------------
-
     latitude: Mapped[float] = mapped_column(
         Float,
         nullable=False,
@@ -58,10 +48,6 @@ class Site(Base, TimestampMixin):
         Float,
         nullable=False,
     )
-
-    # ----------------------------
-    # Site Information
-    # ----------------------------
 
     region: Mapped[str | None] = mapped_column(
         String(150),
@@ -83,10 +69,7 @@ class Site(Base, TimestampMixin):
         nullable=True,
     )
 
-    # ----------------------------
-    # GIS Enrichment
-    # ----------------------------
-
+    # GIS / Environmental features
     land_use: Mapped[str | None] = mapped_column(
         String(100),
         nullable=True,
@@ -107,15 +90,35 @@ class Site(Base, TimestampMixin):
         nullable=True,
     )
 
-    project_id: Mapped[int] = mapped_column(
+    water_body_distance: Mapped[float | None] = mapped_column(
+        Float,
+        nullable=True,
+    )
+
+    protected_area_distance: Mapped[float | None] = mapped_column(
+        Float,
+        nullable=True,
+    )
+
+    land_slope: Mapped[float | None] = mapped_column(
+        Float,
+        nullable=True,
+    )
+
+    vegetation_index: Mapped[float | None] = mapped_column(
+        Float,
+        nullable=True,
+    )
+
+    project_id: Mapped[int | None] = mapped_column(
         ForeignKey(
             "projects.id",
-            ondelete="CASCADE",
+            ondelete="SET NULL",
         ),
-        nullable=False,
+        nullable=True,
         index=True,
     )
 
-    project: Mapped["Project"] = relationship(
+    project: Mapped["Project | None"] = relationship(
         back_populates="sites",
     )

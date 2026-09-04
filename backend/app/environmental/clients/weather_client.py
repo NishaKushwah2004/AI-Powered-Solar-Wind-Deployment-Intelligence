@@ -25,6 +25,12 @@ logger = logging.getLogger(__name__)
 class WeatherClient:
     """
     Client for OpenWeather API.
+
+    Responsibility:
+        Retrieve raw weather observations for a
+        latitude/longitude.
+
+    No scoring or suitability logic belongs here.
     """
 
     def get_weather(
@@ -34,7 +40,7 @@ class WeatherClient:
     ) -> WeatherResult:
 
         logger.info(
-            "Fetching weather for (%s,%s)",
+            "Fetching weather for (%s, %s)",
             latitude,
             longitude,
         )
@@ -57,20 +63,25 @@ class WeatherClient:
 
             data = response.json()
 
+            main = data.get("main", {})
+            wind = data.get("wind", {})
+            clouds = data.get("clouds", {})
+            rain = data.get("rain", {})
+
             return WeatherResult(
-                temperature=data["main"].get("temp"),
-                humidity=data["main"].get("humidity"),
-                rainfall=data.get("rain", {}).get("1h"),
-                wind_speed=data["wind"].get("speed"),
-                wind_direction=data["wind"].get("deg"),
-                pressure=data["main"].get("pressure"),
-                cloud_cover=data["clouds"].get("all"),
+                temperature=main.get("temp"),
+                humidity=main.get("humidity"),
+                rainfall=rain.get("1h"),
+                wind_speed=wind.get("speed"),
+                wind_direction=wind.get("deg"),
+                pressure=main.get("pressure"),
+                cloud_cover=clouds.get("all"),
             )
 
         except requests.Timeout as exc:
 
             logger.exception(
-                "Weather API timed out."
+                "OpenWeather request timed out."
             )
 
             raise WeatherServiceError(
@@ -80,9 +91,19 @@ class WeatherClient:
         except requests.RequestException as exc:
 
             logger.exception(
-                "Weather API request failed."
+                "OpenWeather request failed."
             )
 
             raise WeatherServiceError(
-                f"Weather API failed: {exc}"
+                f"OpenWeather API failed: {exc}"
+            ) from exc
+
+        except (ValueError, TypeError) as exc:
+
+            logger.exception(
+                "Invalid OpenWeather response."
+            )
+
+            raise WeatherServiceError(
+                "OpenWeather returned invalid data."
             ) from exc

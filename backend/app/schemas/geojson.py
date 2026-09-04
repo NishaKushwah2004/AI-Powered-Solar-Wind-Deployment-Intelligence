@@ -1,14 +1,20 @@
 from typing import Any
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+)
 
 
 class Geometry(BaseModel):
     """
-    GeoJSON Point Geometry
+    GeoJSON Point Geometry.
     """
 
-    model_config = ConfigDict(from_attributes=True)
+    model_config = ConfigDict(
+        from_attributes=True
+    )
 
     type: str = "Point"
 
@@ -22,10 +28,12 @@ class Geometry(BaseModel):
 
 class Feature(BaseModel):
     """
-    GeoJSON Feature
+    GeoJSON Feature.
     """
 
-    model_config = ConfigDict(from_attributes=True)
+    model_config = ConfigDict(
+        from_attributes=True
+    )
 
     type: str = "Feature"
 
@@ -41,10 +49,12 @@ class Feature(BaseModel):
 
 class FeatureCollection(BaseModel):
     """
-    GeoJSON FeatureCollection
+    GeoJSON FeatureCollection.
     """
 
-    model_config = ConfigDict(from_attributes=True)
+    model_config = ConfigDict(
+        from_attributes=True
+    )
 
     type: str = "FeatureCollection"
 

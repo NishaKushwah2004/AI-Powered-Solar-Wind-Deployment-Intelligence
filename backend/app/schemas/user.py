@@ -14,6 +14,8 @@ class UserCreate(UserBase):
         min_length=8,
         max_length=128,
     )
+    # Public registration may select only an operational role.
+    # Admin is intentionally excluded from self-registration.
     role_id: int
 
 

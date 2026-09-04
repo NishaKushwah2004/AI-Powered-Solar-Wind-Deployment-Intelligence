@@ -15,6 +15,9 @@ class Settings(BaseSettings):
     HOST: str
     PORT: int
 
+    # Comma-separated browser origins. Keep localhost defaults for local development.
+    ALLOWED_ORIGINS: str = "http://localhost:5173,http://127.0.0.1:5173"
+
     DATABASE_URL: str
 
     SECRET_KEY: str
@@ -33,6 +36,10 @@ class Settings(BaseSettings):
     # continues to operate using NASA POWER + OSM + Elevation.
     SENTINEL_CLIENT_ID: str | None = None
     SENTINEL_CLIENT_SECRET: str | None = None
+
+    ML_PREDICTION_ENABLED: bool = False
+    SOLAR_ML_MODEL_VERSION: str = "v0.1-physics-informed"
+    WIND_ML_MODEL_VERSION: str = "v0.1-physics-informed"
 
     model_config = SettingsConfigDict(
         env_file=BASE_DIR / ".env",
